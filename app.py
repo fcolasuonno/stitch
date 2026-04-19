@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import base64
 import traceback
-from core.converter import convert_svg_to_pes, count_stitches_in_pes, assess_embroidery_quality
+from core.converter import convert_svg_to_vp3, count_stitches_in_vp3, assess_embroidery_quality
 
 app = FastAPI()
 
@@ -30,20 +30,20 @@ async def convert_svg(file: UploadFile = File(...)):
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="Invalid SVG file encoding")
         
-        pes_content = convert_svg_to_pes(svg_content)
+        vp3_content = convert_svg_to_vp3(svg_content)
         
-        if not pes_content:
+        if not vp3_content:
             raise HTTPException(status_code=500, detail="Conversion failed")
             
         # These functions come from core.converter
-        actual_stitch_count = count_stitches_in_pes(pes_content)
-        quality_assessment = assess_embroidery_quality(actual_stitch_count, pes_content)
+        actual_stitch_count = count_stitches_in_vp3(vp3_content)
+        quality_assessment = assess_embroidery_quality(actual_stitch_count, vp3_content)
         
-        pes_b64 = base64.b64encode(pes_content).decode('utf-8')
+        vp3_b64 = base64.b64encode(vp3_content).decode('utf-8')
         
         return JSONResponse({
             "success": True,
-            "pes_base64": pes_b64,
+            "vp3_base64": vp3_b64,
             "message": f"File converted successfully with {quality_assessment['level']} quality",
             "quality": quality_assessment['level'],
             "stitchCount": actual_stitch_count,

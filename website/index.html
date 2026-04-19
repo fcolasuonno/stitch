@@ -1,44 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ur/gd Studios: stitch</title>
-    
+
     <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="stitch - SVG to PES Converter">
-    <meta property="og:description" content="Convert SVG files to PES embroidery format instantly. Professional SVG to PES converter powered by ur/gd Studios.">
-    <meta property="og:image" content="https://dev.stitch.urgdstudios.com/assets/urgd-logo-og.png" id="og-image">
-    <meta property="og:url" content="https://dev.stitch.urgdstudios.com" id="og-url">
+    <meta property="og:title" content="stitch - SVG to VP3 Converter">
+    <meta property="og:description"
+        content="Convert SVG files to VP3 embroidery format instantly. Professional SVG to VP3 converter powered by ur/gd Studios.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ur/gd Studios">
-    
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="stitch - SVG to PES Converter">
-    <meta name="twitter:description" content="Convert SVG files to PES embroidery format instantly. Professional SVG to PES converter powered by ur/gd Studios.">
-    <meta name="twitter:image" content="https://dev.stitch.urgdstudios.com/assets/urgd-logo-og.png" id="twitter-image">
-    <meta name="twitter:site" content="@urgdstudios">
-    
+
     <!-- Additional Meta Tags -->
     <meta name="author" content="ur/gd Studios">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="/" id="canonical-url">
-    
+
     <style>
         @font-face {
             font-family: 'Archivo';
             src: url('Archivo-Bold.ttf') format('truetype');
             font-weight: bold;
         }
+
         @font-face {
             font-family: 'Rubik';
             src: url('Rubik-Regular.ttf') format('truetype');
             font-weight: normal;
         }
-        
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
@@ -49,14 +47,14 @@
             padding: 20px;
             position: relative;
         }
-        
+
         .container {
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(25px) saturate(180%);
             -webkit-backdrop-filter: blur(25px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 20px;
-            box-shadow: 
+            box-shadow:
                 0 20px 40px rgba(0, 0, 0, 0.2),
                 inset 0 1px 0 rgba(255, 255, 255, 0.2),
                 inset 0 -1px 0 rgba(255, 255, 255, 0.05);
@@ -66,7 +64,7 @@
             text-align: center;
             position: relative;
         }
-        
+
         /* Liquid glass highlight layer */
         .container::before {
             content: '';
@@ -75,19 +73,17 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(
-                135deg,
-                rgba(255, 255, 255, 0.12) 0%,
-                rgba(255, 255, 255, 0.03) 30%,
-                transparent 50%,
-                rgba(255, 255, 255, 0.02) 70%,
-                rgba(255, 255, 255, 0.08) 100%
-            );
+            background: linear-gradient(135deg,
+                    rgba(255, 255, 255, 0.12) 0%,
+                    rgba(255, 255, 255, 0.03) 30%,
+                    transparent 50%,
+                    rgba(255, 255, 255, 0.02) 70%,
+                    rgba(255, 255, 255, 0.08) 100%);
             border-radius: 20px;
             pointer-events: none;
             z-index: 1;
         }
-        
+
         /* Additional glass reflection layer */
         .container::after {
             content: '';
@@ -96,46 +92,37 @@
             left: 0;
             right: 0;
             height: 40%;
-            background: linear-gradient(
-                180deg,
-                rgba(255, 255, 255, 0.1) 0%,
-                rgba(255, 255, 255, 0.02) 50%,
-                transparent 100%
-            );
+            background: linear-gradient(180deg,
+                    rgba(255, 255, 255, 0.1) 0%,
+                    rgba(255, 255, 255, 0.02) 50%,
+                    transparent 100%);
             border-radius: 20px 20px 0 0;
             pointer-events: none;
             z-index: 1;
         }
-        
+
         /* Ensure content stays above mirror effect */
-        .container > * {
+        .container>* {
             position: relative;
             z-index: 2;
         }
-        
-        .urgd-logo {
-            height: 300px;
-            margin-bottom: -50px;
-            margin-top: -50px;
-            filter: brightness(0.9) contrast(1.0);
-        }
-        
-        .logo { 
-            font-size: 2.5rem; 
-            font-weight: bold; 
-            color: #667eea; 
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
             margin-bottom: 10px;
             font-family: 'Archivo', sans-serif;
             text-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
         }
-        
-        .subtitle { 
-            color: rgba(255, 255, 255, 0.7); 
-            margin-bottom: 30px; 
-            font-size: 1.1rem; 
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 30px;
+            font-size: 1.1rem;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
         }
-        
+
         .upload-area {
             border: 3px dashed rgba(255, 255, 255, 0.15);
             border-radius: 15px;
@@ -147,188 +134,190 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
-        
-        .upload-area:hover { 
-            border-color: #667eea; 
+
+        .upload-area:hover {
+            border-color: #667eea;
             background: rgba(102, 126, 234, 0.05);
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
         }
-        
-        .upload-area.dragover { 
-            border-color: #667eea; 
+
+        .upload-area.dragover {
+            border-color: #667eea;
             background: rgba(102, 126, 234, 0.08);
             transform: scale(1.02);
         }
-        
-        .upload-icon { 
-            font-size: 3rem; 
-            color: rgba(255, 255, 255, 0.6); 
-            margin-bottom: 15px; 
+
+        .upload-icon {
+            font-size: 3rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 15px;
         }
-        
-        .upload-text { 
-            font-size: 1.2rem; 
-            color: rgba(255, 255, 255, 0.9); 
-            margin-bottom: 10px; 
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 10px;
         }
-        
-        .upload-hint { 
-            color: rgba(255, 255, 255, 0.6); 
-            font-size: 0.9rem; 
+
+        .upload-hint {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
         }
-        
-        #fileInput { display: none; }
-        
-        .file-info { 
-            margin: 20px 0; 
-            padding: 15px; 
-            background: rgba(102, 126, 234, 0.1); 
-            border-radius: 10px; 
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
             display: none;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(102, 126, 234, 0.2);
         }
-        
-        .file-name { 
-            font-weight: bold; 
-            color: rgba(255, 255, 255, 0.9); 
-            margin-bottom: 5px; 
+
+        .file-name {
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 5px;
         }
-        
-        .file-size { 
-            color: rgba(255, 255, 255, 0.6); 
-            font-size: 0.9rem; 
+
+        .file-size {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
         }
-        
+
         .convert-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; 
-            border: none; 
-            padding: 15px 40px; 
+            color: white;
+            border: none;
+            padding: 15px 40px;
             border-radius: 50px;
-            font-size: 1.1rem; 
-            font-weight: bold; 
-            cursor: pointer; 
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
             transition: all 0.3s ease;
-            margin: 20px 0; 
+            margin: 20px 0;
             min-width: 200px;
-            box-shadow: 
+            box-shadow:
                 0 8px 25px rgba(102, 126, 234, 0.25),
                 inset 0 1px 0 rgba(255, 255, 255, 0.15);
         }
-        
-        .convert-btn:hover:not(:disabled) { 
-            transform: translateY(-2px); 
-            box-shadow: 
+
+        .convert-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow:
                 0 12px 35px rgba(102, 126, 234, 0.3),
                 inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
-        
-        .convert-btn:disabled { 
-            opacity: 0.6; 
-            cursor: not-allowed; 
+
+        .convert-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
-        
-        .progress-container { 
-            margin: 20px 0; 
-            display: none; 
+
+        .progress-container {
+            margin: 20px 0;
+            display: none;
         }
-        
-        .progress-bar { 
-            width: 100%; 
-            height: 8px; 
-            background: rgba(255, 255, 255, 0.08); 
-            border-radius: 4px; 
-            overflow: hidden; 
-            margin-bottom: 10px; 
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
         }
-        
-        .progress-fill { 
-            height: 100%; 
-            background: linear-gradient(90deg, #667eea, #764ba2); 
-            width: 0%; 
-            transition: width 0.3s ease; 
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
         }
-        
-        .progress-text { 
-            color: rgba(255, 255, 255, 0.8); 
-            font-size: 0.9rem; 
+
+        .progress-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
         }
-        
-        .download-area { 
-            margin: 20px 0; 
-            padding: 20px; 
-            background: rgba(34, 197, 94, 0.1); 
-            border-radius: 10px; 
+
+        .download-area {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 10px;
             display: none;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(34, 197, 94, 0.2);
         }
-        
-        .download-btn { 
-            background: #4CAF50; 
-            color: white; 
-            border: none; 
-            padding: 12px 30px; 
-            border-radius: 25px; 
-            font-size: 1rem; 
-            cursor: pointer; 
-            text-decoration: none; 
-            display: inline-block; 
+
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
             margin: 10px 0;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
-        
-        .download-btn:hover { 
-            background: #45a049; 
+
+        .download-btn:hover {
+            background: #45a049;
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
         }
-        
-        .error { 
-            background: rgba(239, 68, 68, 0.1); 
-            color: #ff6b6b; 
-            padding: 15px; 
-            border-radius: 10px; 
-            margin: 20px 0; 
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
             display: none;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
-        
-        .success { 
-            background: rgba(34, 197, 94, 0.1); 
-            color: #51cf66; 
-            padding: 15px; 
-            border-radius: 10px; 
-            margin: 20px 0; 
+
+        .success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #51cf66;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
             display: none;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(34, 197, 94, 0.2);
         }
-        
-        .footer { 
-            margin-top: 30px; 
-            color: rgba(255, 255, 255, 0.4); 
-            font-size: 0.9rem; 
+
+        .footer {
+            margin-top: 30px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.9rem;
         }
-        
+
         .footer a {
             color: #667eea;
             text-decoration: none;
             transition: color 0.3s ease;
         }
-        
+
         .footer a:hover {
             color: #764ba2;
         }
-        
+
         /* Loading animation */
         .loading {
             display: inline-block;
@@ -340,20 +329,18 @@
             animation: spin 1s ease-in-out infinite;
             margin-right: 10px;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
-        
+
         /* Responsive design */
         @media (max-width: 600px) {
             .container {
                 padding: 30px 20px;
                 margin: 10px;
-            }
-            
-            .urgd-logo {
-                height: 250px;
             }
         }
 
@@ -373,7 +360,9 @@
             top: 6px;
         }
 
-        .convert-btn:focus, .download-btn:focus, #fileInput:focus {
+        .convert-btn:focus,
+        .download-btn:focus,
+        #fileInput:focus {
             outline: 2px solid #00ff88;
             outline-offset: 2px;
         }
@@ -392,42 +381,43 @@
         }
     </style>
 </head>
+
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="container" id="main-content">
-        <img src="assets/urgd-logo.png" alt="ur/gd Studios logo" class="urgd-logo" />
         <div class="logo">🧵 stitch</div>
-        <div class="subtitle">Convert SVG files to PES embroidery format</div>
-        
+        <div class="subtitle">Convert SVG files to VP3 embroidery format</div>
+
         <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload SVG file area">
             <div class="upload-icon">📁</div>
             <div class="upload-text">Click to select SVG file</div>
             <div class="upload-hint">or drag and drop here</div>
             <input type="file" id="fileInput" accept=".svg" aria-label="Select SVG file to convert" />
         </div>
-        
+
         <div class="file-info" id="fileInfo">
             <div class="file-name" id="fileName"></div>
             <div class="file-size" id="fileSize"></div>
         </div>
-        
-        <button class="convert-btn" id="convertBtn" role="button" aria-label="Convert selected SVG file to PES format" disabled>Convert to PES</button>
-        
+
+        <button class="convert-btn" id="convertBtn" role="button" aria-label="Convert selected SVG file to VP3 format"
+            disabled>Convert to VP3</button>
+
         <div class="progress-container" id="progressContainer" role="progressbar" aria-label="Conversion progress">
-            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
             <div class="progress-text" id="progressText">Converting...</div>
         </div>
-        
+
         <div class="download-area" id="downloadArea">
             <div>✅ Conversion complete!</div>
-            <a href="#" class="download-btn" id="downloadBtn" role="button" aria-label="Download converted PES file">Download PES File</a>
+            <a href="#" class="download-btn" id="downloadBtn" role="button"
+                aria-label="Download converted VP3 file">Download VP3 File</a>
         </div>
-        
+
         <div class="error" id="errorMessage" role="alert" aria-live="polite"></div>
         <div class="success" id="successMessage" role="status" aria-live="polite"></div>
-        
-        <div class="footer">Quietly powerful, built by <a href="https://www.urgdstudios.com" target="_blank" aria-label="Visit ur/gd Studios website">ur/gd Studios</a><br>
-        <small style="opacity: 0.7; font-size: 0.8em;">See our <a href="https://www.urgdstudios.com" target="_blank" aria-label="View Terms of Use and Privacy Policy">main page</a> for Terms of Use and Privacy Policy</small></div>
     </div>
 
     <script>
@@ -444,25 +434,14 @@
         const downloadBtn = document.getElementById('downloadBtn');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
-        
+
         let selectedFile = null;
-        
-        // Environment detection
-        function getEnvironment() {
-            const hostname = window.location.hostname;
-            if (hostname.includes('dev.stitch.urgdstudios.com')) return 'dev';
-            if (hostname.includes('staging.stitch.urgdstudios.com')) return 'staging';
-            if (hostname.includes('stitch.urgdstudios.com')) return 'prod';
-            return 'dev'; // Default to dev for local testing
-        }
-        
-        const environment = getEnvironment();
-        
+
         // Upload area click handler
         uploadArea.addEventListener('click', () => {
             fileInput.click();
         });
-        
+
         // File input change handler
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -477,21 +456,21 @@
                 showError('Please select a valid SVG file');
             }
         });
-        
+
         // Drag and drop handlers
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
-        
+
         uploadArea.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
-        
+
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            
+
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'image/svg+xml') {
                 selectedFile = file;
@@ -505,129 +484,123 @@
                 showError('Please select a valid SVG file');
             }
         });
-        
+
         // Convert button handler - now uses Shield integration
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
-            
+
             convertBtn.disabled = true;
             convertBtn.innerHTML = '<span class="loading"></span>Preparing...';
             progressContainer.style.display = 'block';
             hideMessages();
-            
+
             try {
                 await handleFileUpload(selectedFile);
             } catch (error) {
                 showError('Upload failed: ' + error.message);
             } finally {
                 convertBtn.disabled = false;
-                convertBtn.innerHTML = 'Convert to PES';
+                convertBtn.innerHTML = 'Convert to VP3';
             }
         });
-        
+
         // Local FastAPI upload handler
         async function handleFileUpload(file) {
             try {
-                showStatus('Converting SVG to PES...');
-                
+                showStatus('Converting SVG to VP3...');
+
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 const response = await fetch('/api/convert', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (!response.ok) {
                     let errMsg = `Conversion failed: ${response.status}`;
                     try {
                         const errData = await response.json();
                         if (errData.detail) errMsg = errData.detail;
-                    } catch (e) {}
+                    } catch (e) { }
                     throw new Error(errMsg);
                 }
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     // Create blob from base64
-                    const byteCharacters = atob(result.pes_base64);
+                    const byteCharacters = atob(result.vp3_base64);
                     const byteNumbers = new Array(byteCharacters.length);
                     for (let i = 0; i < byteCharacters.length; i++) {
                         byteNumbers[i] = byteCharacters.charCodeAt(i);
                     }
                     const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], {type: 'application/octet-stream'});
-                    
+                    const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+
                     // Create download URL
                     const blobUrl = URL.createObjectURL(blob);
-                    
+
                     downloadBtn.href = blobUrl;
-                    downloadBtn.download = file.name.replace('.svg', '.pes');
+                    downloadBtn.download = file.name.replace('.svg', '.vp3');
                     downloadArea.style.display = 'block';
-                    
+
                     // Add listener to cleanup blob URL
                     downloadBtn.addEventListener('click', function cleanup() {
                         setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
                         downloadBtn.removeEventListener('click', cleanup);
                     });
-                    
+
                     showSuccess(`Conversion complete! ${result.stitchCount} stitches, ${result.quality} quality`);
                 } else {
                     showError('Conversion failed: ' + (result.message || 'Unknown error'));
                 }
-                
+
             } catch (error) {
                 showError('Upload failed: ' + error.message);
             }
         }
-        
+
         // Helper function for status display
         function showStatus(message) {
             progressText.textContent = message;
             progressFill.style.width = '50%'; // Show some progress during processing
         }
-        
+
         // Sleep helper function
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
-        
+
         function showError(message) {
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
             successMessage.style.display = 'none';
         }
-        
+
         function showSuccess(message) {
             successMessage.textContent = message;
             successMessage.style.display = 'block';
             errorMessage.style.display = 'none';
         }
-        
+
         function hideMessages() {
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
         }
     </script>
-    
+
     <!-- Environment-aware meta tags -->
     <script>
         // Set environment-aware URLs for social media previews
-        (function() {
+        (function () {
             const currentUrl = window.location.href;
             const baseUrl = currentUrl.split('?')[0]; // Remove query params
-            
-            // Set Open Graph URLs
-            document.getElementById('og-image').setAttribute('content', baseUrl + '/assets/urgd-logo-og.png');
-            document.getElementById('og-url').setAttribute('content', baseUrl);
-            
-            // Set Twitter Card URLs
-            document.getElementById('twitter-image').setAttribute('content', baseUrl + '/assets/urgd-logo-og.png');
-            
+
             // Set canonical URL
             document.getElementById('canonical-url').setAttribute('href', baseUrl);
         })();
     </script>
 </body>
+
 </html>
