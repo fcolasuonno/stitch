@@ -70,3 +70,4 @@ response.json
 analyze_*.py
 payload.b64
 *.dist-info/
+test_examples/

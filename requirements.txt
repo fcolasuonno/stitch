@@ -1,0 +1,6 @@
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+svgpathtools>=1.7.1
+svg.path>=6.3
+pyembroidery>=1.5.1

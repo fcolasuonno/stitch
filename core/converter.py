@@ -1,5 +1,4 @@
 import json
-import boto3
 import os
 import tempfile
 import uuid
@@ -63,9 +62,6 @@ except ImportError:
     PYEMBROIDERY_AVAILABLE = False
     print("Warning: pyembroidery library not available, using fallback conversion")
 
-s3_client = boto3.client('s3')
-dynamodb = boto3.resource('dynamodb')
-BUCKET_NAME = os.environ.get('BUCKET_NAME', 'urgd-stitch-storage')
 
 # High quality settings for professional embroidery
 PROFESSIONAL_SETTINGS = {
@@ -82,269 +78,6 @@ PROFESSIONAL_SETTINGS = {
     'max_stitches_per_block': 5000,  # Allow more stitches for high quality
     'quality_level': 'high'  # high quality for professional results
 }
-
-def lambda_handler(event, context):
-    """
-    Lambda handler for SVG to PES conversion.
-    Supports both sync (API Gateway) and async (Shield callback) invocation.
-    """
-    
-    try:
-        # Check invocation source
-        if 'request_id' in event:
-            # Async invocation from shield_callback
-            logger.info("Async invocation from Shield callback")
-            return handle_async_conversion(event, context)
-        elif 'httpMethod' in event:
-            # Sync invocation from API Gateway (legacy)
-            logger.info("Sync invocation from API Gateway")
-            return handle_sync_conversion(event, context)
-        else:
-            logger.error(f"Unknown event structure: {json.dumps(event, default=str)}")
-            return {
-                'statusCode': 400,
-                'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'Invalid event structure'})
-            }
-            
-    except Exception as e:
-        logger.error(f"Error in lambda_handler: {str(e)}")
-        logger.error(traceback.format_exc())
-        return {
-            'statusCode': 500,
-            'headers': get_cors_headers(),
-            'body': json.dumps({'error': 'Internal server error'})
-        }
-
-def handle_sync_conversion(event, context):
-    """Handle synchronous conversion from API Gateway (legacy)."""
-    try:
-        # Get HTTP method from API Gateway event structure
-        http_method = event.get('httpMethod', 'GET')
-        
-        # Handle CORS preflight requests
-        if http_method == 'OPTIONS':
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                    'Access-Control-Max-Age': '86400'
-                },
-                'body': ''
-            }
-        
-        # Handle file conversion on POST requests
-        if http_method == 'POST':
-            return handle_conversion(event, context)
-        
-        else:
-            return {
-                'statusCode': 405,
-                'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'Method not allowed'})
-            }
-            
-    except Exception as e:
-        logger.error(f"Error in sync conversion: {str(e)}")
-        logger.error(traceback.format_exc())
-        return {
-            'statusCode': 500,
-            'headers': get_cors_headers(),
-            'body': json.dumps({'error': 'Internal server error'})
-        }
-
-def handle_async_conversion(event, context):
-    """Handle asynchronous conversion from Shield callback."""
-    try:
-        request_id = event['request_id']
-        source_bucket = event['source_bucket']
-        source_key = event['source_key']
-        
-        logger.info(f"Processing async conversion for request: {request_id}")
-        logger.info(f"Source: {source_bucket}/{source_key}")
-        
-        # Update status to converting
-        update_status(request_id, 'converting')
-        
-        # Download SVG from processing bucket
-        logger.info(f"Downloading SVG from {source_bucket}/{source_key}")
-        svg_obj = s3_client.get_object(Bucket=source_bucket, Key=source_key)
-        svg_content = svg_obj['Body'].read().decode('utf-8')
-        
-        logger.info(f"Downloaded SVG content ({len(svg_content)} chars)")
-        
-        # Convert SVG to PES (existing logic)
-        logger.info("Starting SVG to PES conversion")
-        pes_content = convert_svg_to_pes(svg_content)
-        
-        if not pes_content:
-            raise Exception("Conversion failed - no PES content generated")
-        
-        logger.info(f"Conversion complete, PES size: {len(pes_content)} bytes")
-        
-        # Save to converted bucket
-        pes_key = f"converted/{request_id}.pes"
-        s3_client.put_object(
-            Bucket=BUCKET_NAME,
-            Key=pes_key,
-            Body=pes_content,
-            ContentType='application/octet-stream'
-        )
-        
-        logger.info(f"PES file saved to {BUCKET_NAME}/{pes_key}")
-        
-        # Count stitches and assess quality
-        stitch_count = count_stitches_in_pes(pes_content)
-        quality = assess_embroidery_quality(stitch_count, pes_content)
-        
-        logger.info(f"Quality assessment: {quality['level']}, {stitch_count} stitches")
-        
-        # Update status to complete
-        update_status(request_id, 'converted', {
-            'pes_key': pes_key,
-            'stitch_count': stitch_count,
-            'quality': quality['level']
-        })
-        
-        # Clean up processing bucket
-        s3_client.delete_object(Bucket=source_bucket, Key=source_key)
-        logger.info(f"Cleaned up processing file: {source_key}")
-        
-        return {'statusCode': 200, 'body': 'Conversion complete'}
-        
-    except Exception as e:
-        logger.error(f"Async conversion failed: {str(e)}")
-        logger.error(traceback.format_exc())
-        
-        # Update status to failed
-        if 'request_id' in event:
-            update_status(event['request_id'], 'failed', {'error': str(e)})
-        
-        raise
-
-def update_status(request_id, status, additional_data=None):
-    """Update conversion status in DynamoDB."""
-    try:
-        table_name = os.environ.get('STATUS_TABLE_NAME')
-        if not table_name:
-            logger.warning("STATUS_TABLE_NAME not set, skipping status update")
-            return
-        
-        table = dynamodb.Table(table_name)
-        
-        update_expression = 'SET #status = :status, #timestamp = :timestamp'
-        expression_attribute_names = {
-            '#status': 'status',
-            '#timestamp': 'timestamp'
-        }
-        expression_attribute_values = {
-            ':status': status,
-            ':timestamp': datetime.utcnow().isoformat()
-        }
-        
-        if additional_data:
-            for key, value in additional_data.items():
-                update_expression += f', #{key} = :{key}'
-                expression_attribute_names[f'#{key}'] = key
-                expression_attribute_values[f':{key}'] = value
-        
-        table.update_item(
-            Key={'request_id': request_id},
-            UpdateExpression=update_expression,
-            ExpressionAttributeNames=expression_attribute_names,
-            ExpressionAttributeValues=expression_attribute_values
-        )
-        
-        logger.info(f"Updated status for {request_id}: {status}")
-        
-    except Exception as e:
-        logger.error(f"Failed to update status: {str(e)}")
-        # Don't fail the conversion if status update fails
-
-def handle_conversion(event, context):
-    """Handle SVG to PES file conversion."""
-    try:
-        # Parse the multipart form data
-        if 'body' not in event:
-            return {
-                'statusCode': 400,
-                'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'No file provided'})
-            }
-        
-        # For Lambda Function URL, the body is base64 encoded
-        body = event['body']
-        if event.get('isBase64Encoded', False):
-            body = base64.b64decode(body).decode('utf-8')
-        
-        # Parse multipart form data
-        svg_content = parse_multipart_data(body)
-        
-        if not svg_content:
-            return {
-                'statusCode': 400,
-                'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'Invalid SVG file'})
-            }
-        
-        # Convert SVG to PES with professional quality
-        pes_content = convert_svg_to_pes(svg_content)
-        
-        if not pes_content:
-            return {
-                'statusCode': 500,
-                'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'Conversion failed'})
-            }
-        
-        # Upload PES file to S3 and get presigned URL
-        file_id = str(uuid.uuid4())
-        pes_key = f"converted/{file_id}.pes"
-        
-        s3_client.put_object(
-            Bucket=BUCKET_NAME,
-            Key=pes_key,
-            Body=pes_content,
-            ContentType='application/octet-stream'
-        )
-        
-        # Generate presigned URL for download (valid for 1 hour)
-        download_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': pes_key},
-            ExpiresIn=3600
-        )
-        
-        # Calculate actual stitch count from PES content
-        actual_stitch_count = count_stitches_in_pes(pes_content)
-        
-        # Determine quality based on stitch count and complexity
-        quality_assessment = assess_embroidery_quality(actual_stitch_count, pes_content)
-        
-        return {
-            'statusCode': 200,
-            'headers': get_cors_headers(),
-            'body': json.dumps({
-                'success': True,
-                'downloadUrl': download_url,
-                'message': f'File converted successfully with {quality_assessment["level"]} quality',
-                'quality': quality_assessment['level'],
-                'stitchCount': actual_stitch_count,
-                'complexity': quality_assessment['complexity'],
-                'dimensions': quality_assessment['dimensions']
-            })
-        }
-        
-    except Exception as e:
-        print(f"Error in conversion: {str(e)}")
-        print(traceback.format_exc())
-        return {
-            'statusCode': 500,
-            'headers': get_cors_headers(),
-            'body': json.dumps({'error': 'Conversion failed: ' + str(e)})
-        }
 
 def parse_multipart_data(body):
     """Parse multipart form data to extract SVG content."""
@@ -396,15 +129,56 @@ def extract_svg_elements(svg_content: str) -> List[Dict[str, Any]]:
                 svg_x, svg_y, svg_width, svg_height = 0, 0, 100, 100
         else:
             svg_x, svg_y, svg_width, svg_height = 0, 0, 100, 100
+
+        # Parse CSS styles from <style> elements
+        classes_styles = {}
+        for style_elem in root.iter():
+            if style_elem.tag.endswith('style') and style_elem.text:
+                # Naive CSS parser for classes
+                css_text = style_elem.text
+                matches = re.finditer(r'\.([a-zA-Z0-9_-]+)\s*\{\s*([^}]+)\s*\}', css_text)
+                for match in matches:
+                    cls_name = match.group(1)
+                    rules_str = match.group(2)
+                    rules = {}
+                    for rule in rules_str.split(';'):
+                        rule = rule.strip()
+                        if ':' in rule:
+                            k, v = rule.split(':', 1)
+                            rules[k.strip()] = v.strip()
+                    classes_styles[cls_name] = rules
         
         # Extract elements
         for elem in root.iter():
             if elem.tag.endswith(('path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon')):
+                fill = elem.get('fill')
+                stroke = elem.get('stroke')
+                stroke_width_val = elem.get('stroke-width')
+                
+                # Fallback to class styles
+                elem_class = elem.get('class')
+                if elem_class and elem_class in classes_styles:
+                    cls_rules = classes_styles[elem_class]
+                    if fill is None and 'fill' in cls_rules: fill = cls_rules['fill']
+                    if stroke is None and 'stroke' in cls_rules: stroke = cls_rules['stroke']
+                    if stroke_width_val is None and 'stroke-width' in cls_rules: stroke_width_val = cls_rules['stroke-width']
+                
+                # Override with inline style attributes
+                style_attr = elem.get('style')
+                if style_attr:
+                    for rule in style_attr.split(';'):
+                        rule = rule.strip()
+                        if ':' in rule:
+                            k, v = rule.split(':', 1)
+                            if k.strip() == 'fill': fill = v.strip()
+                            elif k.strip() == 'stroke': stroke = v.strip()
+                            elif k.strip() == 'stroke-width': stroke_width_val = v.strip()
+                
                 element_data = {
                     'tag': elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag,
-                    'fill': elem.get('fill', 'none'),
-                    'stroke': elem.get('stroke', 'none'),
-                    'stroke_width': float(elem.get('stroke-width', '1')),
+                    'fill': fill if fill else 'none',
+                    'stroke': stroke if stroke else 'none',
+                    'stroke_width': float(stroke_width_val) if stroke_width_val else 1.0,
                     'transform': elem.get('transform', ''),
                     'd': elem.get('d', ''),  # For path elements
                     'x': float(elem.get('x', '0')),
@@ -893,12 +667,12 @@ def add_svg_to_pattern(pattern, svg_content):
                     max_y = center_y + min_dimension / 2
                 
                 # Add corner stitches to ensure proper bounds
-                pattern.add_stitch_absolute(min_x, min_y, pyembroidery.JUMP)
-                pattern.add_stitch_absolute(max_x, min_y, pyembroidery.STITCH)
-                pattern.add_stitch_absolute(max_x, max_y, pyembroidery.STITCH)
-                pattern.add_stitch_absolute(min_x, max_y, pyembroidery.STITCH)
-                pattern.add_stitch_absolute(min_x, min_y, pyembroidery.STITCH)
-                pattern.add_stitch_absolute(min_x, min_y, pyembroidery.TRIM)
+                pattern.add_stitch_absolute(pyembroidery.JUMP, min_x, min_y)
+                pattern.add_stitch_absolute(pyembroidery.STITCH, max_x, min_y)
+                pattern.add_stitch_absolute(pyembroidery.STITCH, max_x, max_y)
+                pattern.add_stitch_absolute(pyembroidery.STITCH, min_x, max_y)
+                pattern.add_stitch_absolute(pyembroidery.STITCH, min_x, min_y)
+                pattern.add_stitch_absolute(pyembroidery.TRIM, min_x, min_y)
         
         for block_idx, block in enumerate(stitch_blocks):
             color = block['color']
@@ -906,7 +680,7 @@ def add_svg_to_pattern(pattern, svg_content):
             
             # Add color change if needed
             if current_color != color:
-                pattern.add_stitch_absolute(0, 0, pyembroidery.COLOR_CHANGE)
+                pattern.add_stitch_absolute(pyembroidery.COLOR_CHANGE, 0, 0)
                 current_color = color
             
             # Add stitches
@@ -919,29 +693,29 @@ def add_svg_to_pattern(pattern, svg_content):
                 
                 if i == 0:
                     # First stitch - jump to position
-                    pattern.add_stitch_absolute(x, y, pyembroidery.JUMP)
+                    pattern.add_stitch_absolute(pyembroidery.JUMP, x, y)
                 else:
                     # Regular stitch
-                    pattern.add_stitch_absolute(x, y, pyembroidery.STITCH)
+                    pattern.add_stitch_absolute(pyembroidery.STITCH, x, y)
             
             # Add trim between different stitch blocks
             if block != stitch_blocks[-1]:
-                pattern.add_stitch_absolute(x, y, pyembroidery.TRIM)
+                pattern.add_stitch_absolute(pyembroidery.TRIM, x, y)
         
         # End pattern
         if stitch_blocks:
             last_x, last_y = stitch_blocks[-1]['stitches'][-1]
-            pattern.add_stitch_absolute(last_x, last_y, pyembroidery.END)
+            pattern.add_stitch_absolute(pyembroidery.END, last_x, last_y)
         
     except Exception as e:
         print(f"Error in add_svg_to_pattern: {e}")
         # Fallback to simple rectangle
-        pattern.add_stitch_absolute(0, 0, pyembroidery.STITCH)
-        pattern.add_stitch_absolute(100, 0, pyembroidery.STITCH)
-        pattern.add_stitch_absolute(100, 100, pyembroidery.STITCH)
-        pattern.add_stitch_absolute(0, 100, pyembroidery.STITCH)
-        pattern.add_stitch_absolute(0, 0, pyembroidery.STITCH)
-        pattern.add_stitch_absolute(0, 0, pyembroidery.END)
+        pattern.add_stitch_absolute(pyembroidery.STITCH, 0, 0)
+        pattern.add_stitch_absolute(pyembroidery.STITCH, 100, 0)
+        pattern.add_stitch_absolute(pyembroidery.STITCH, 100, 100)
+        pattern.add_stitch_absolute(pyembroidery.STITCH, 0, 100)
+        pattern.add_stitch_absolute(pyembroidery.STITCH, 0, 0)
+        pattern.add_stitch_absolute(pyembroidery.END, 0, 0)
 
 def convert_element_to_coordinates(element):
     """Convert SVG element to coordinate list based on element type."""
@@ -1018,12 +792,15 @@ def convert_polygon_to_coordinates(element):
         return []
     
     coords = []
-    parts = points_str.split()
+    parts = [p for p in re.split(r'[, \s]+', points_str) if p]
     for i in range(0, len(parts), 2):
         if i + 1 < len(parts):
-            x = float(parts[i])
-            y = float(parts[i + 1])
-            coords.append((x, y))
+            try:
+                x = float(parts[i])
+                y = float(parts[i + 1])
+                coords.append((x, y))
+            except ValueError:
+                continue
     
     # Close polygon if it's a polygon (not polyline)
     if element['tag'] == 'polygon' and coords and coords[0] != coords[-1]:

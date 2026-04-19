@@ -1,7 +1,0 @@
-# Basic dependencies only - heavy stuff is in the layers!
-python-multipart>=0.0.6,<1.0.0
-
-# Note: boto3 is already available in Lambda runtime
-# All the heavy dependencies (Pillow, OpenCV, scipy, numpy, etc.)
-# are now provided by the Lambda layers!
-# This makes deployments MUCH faster! 🚀

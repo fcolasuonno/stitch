@@ -1,4 +1,0 @@
-# SVG & EMBROIDERY LAYER - MINIMAL
-svgpathtools>=1.7.1
-svg.path>=6.3
-pyembroidery>=1.5.1
