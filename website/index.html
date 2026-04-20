@@ -334,6 +334,131 @@
             border: 1px solid rgba(34, 197, 94, 0.2);
         }
 
+        /* Settings Panel Styles */
+        .settings-panel {
+            margin: 20px 0;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .settings-header {
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+            user-select: none;
+        }
+
+        .settings-header:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .settings-content {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+        }
+
+        .setting-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .setting-slider {
+            flex: 1;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        .setting-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #764ba2;
+        }
+
+        .setting-input {
+            width: 70px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: white;
+            padding: 4px 8px;
+            font-size: 0.85rem;
+            text-align: right;
+            outline: none;
+        }
+
+        .setting-input:focus {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .setting-unit {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.75rem;
+            margin-left: 4px;
+        }
+
+        .settings-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .settings-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .settings-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .settings-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         .footer {
             margin-top: 30px;
             color: rgba(255, 255, 255, 0.4);
@@ -432,6 +557,16 @@
             <div class="file-size" id="fileSize"></div>
         </div>
 
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-header" id="settingsHeader">
+                <span>⚙️ Advanced Settings</span>
+                <span id="settingsToggle">expand_more</span>
+            </div>
+            <div class="settings-content" id="settingsContent" style="display: none;">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
         <button class="convert-btn" id="convertBtn" role="button" aria-label="Convert selected SVG file to VP3 format"
             disabled>Convert to VP3</button>
 
@@ -473,8 +608,85 @@
         const previewImage = document.getElementById('previewImage');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
+        const settingsHeader = document.getElementById('settingsHeader');
+        const settingsContent = document.getElementById('settingsContent');
+        const settingsToggle = document.getElementById('settingsToggle');
 
         let selectedFile = null;
+        let currentSettings = {};
+        let settingsMeta = [];
+        let isConverting = false;
+
+        // Settings toggle
+        settingsHeader.addEventListener('click', () => {
+            const isVisible = settingsContent.style.display !== 'none';
+            settingsContent.style.display = isVisible ? 'none' : 'grid';
+            settingsToggle.textContent = isVisible ? 'expand_more' : 'expand_less';
+        });
+
+        // Initialize settings
+        async function initSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                currentSettings = data.defaults;
+                settingsMeta = data.meta;
+                renderSettings();
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        function renderSettings() {
+            settingsContent.innerHTML = '';
+            settingsMeta.forEach(meta => {
+                const val = currentSettings[meta.key];
+                const group = document.createElement('div');
+                group.className = 'setting-group';
+                group.innerHTML = `
+                    <div class="setting-label-row">
+                        <label class="setting-label" for="setting-${meta.key}">${meta.label}</label>
+                    </div>
+                    <div class="setting-controls">
+                        <input type="range" class="setting-slider" id="slider-${meta.key}" 
+                            min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${val}">
+                        <div style="display: flex; align-items: center;">
+                            <input type="number" class="setting-input" id="input-${meta.key}" 
+                                min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${val}">
+                            <span class="setting-unit">${meta.unit}</span>
+                        </div>
+                    </div>
+                `;
+                settingsContent.appendChild(group);
+
+                const slider = group.querySelector(`#slider-${meta.key}`);
+                const input = group.querySelector(`#input-${meta.key}`);
+
+                const update = (newVal, skipConversion = false) => {
+                    newVal = parseFloat(newVal);
+                    currentSettings[meta.key] = newVal;
+                    slider.value = newVal;
+                    input.value = newVal;
+                    
+                    if (!skipConversion && selectedFile && !isConverting) {
+                        triggerAutoConvert();
+                    }
+                };
+
+                slider.addEventListener('input', (e) => update(e.target.value));
+                input.addEventListener('change', (e) => update(e.target.value));
+            });
+        }
+
+        let convertTimeout = null;
+        function triggerAutoConvert() {
+            if (convertTimeout) clearTimeout(convertTimeout);
+            convertTimeout = setTimeout(() => {
+                handleFileUpload(selectedFile);
+            }, 500);
+        }
+
+        initSettings();
 
         // Upload area click handler
         uploadArea.addEventListener('click', () => {
@@ -545,11 +757,14 @@
 
         // Local FastAPI upload handler
         async function handleFileUpload(file) {
+            if (isConverting) return;
             try {
+                isConverting = true;
                 showStatus('Converting SVG to VP3...');
 
                 const formData = new FormData();
                 formData.append('file', file);
+                formData.append('settings', JSON.stringify(currentSettings));
 
                 const response = await fetch('/api/convert', {
                     method: 'POST',
@@ -606,6 +821,8 @@
 
             } catch (error) {
                 showError('Upload failed: ' + error.message);
+            } finally {
+                isConverting = false;
             }
         }
 

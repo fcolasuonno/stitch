@@ -68,6 +68,14 @@ PROFESSIONAL_SETTINGS = {
     'target_width_mm':      100.0, # output design width
 }
 
+def _get_settings(overrides: Optional[Dict[str, Any]] = None) -> dict:
+    """Return PROFESSIONAL_SETTINGS merged with caller overrides."""
+    if not overrides:
+        return dict(PROFESSIONAL_SETTINGS)
+    merged = dict(PROFESSIONAL_SETTINGS)
+    merged.update(overrides)
+    return merged
+
 # ── named thread colours (hex → (name, brand)) ─────────────────────────────
 _THREAD_NAMES: Dict[str, Tuple[str, str]] = {
     '676767': ('Medium Gray',     'Madeira 1713'),
@@ -490,10 +498,12 @@ def element_to_subpaths(el: dict) -> List[List[Tuple[float,float]]]:
 # ── coordinate scaling ───────────────────────────────────────────────────────
 def scale_coords(coords: List[Tuple[float,float]],
                  svg_w: float, svg_h: float,
-                 target_mm: float = None) -> List[Tuple[float,float]]:
+                 target_mm: float = None,
+                 settings: Optional[dict] = None) -> List[Tuple[float,float]]:
     if not coords:
         return []
-    target_mm = target_mm or PROFESSIONAL_SETTINGS['target_width_mm']
+    s = _get_settings(settings)
+    target_mm = target_mm or s['target_width_mm']
     scale = target_mm / max(svg_w, svg_h)
     return [(x*scale, y*scale) for x,y in coords]
 
@@ -519,12 +529,13 @@ def _shape_narrow_width(pts):
 def generate_scanline_fill(polygon: List[Tuple[float,float]],
                            row_spacing: float = None,
                            stitch_length: float = None,
-                           angle_deg: float = 45.0) -> List[Tuple[float,float]]:
+                           angle_deg: float = 45.0,
+                           settings: Optional[dict] = None) -> List[Tuple[float,float]]:
     """
     Tatami scanline fill.  Rotates the polygon by -angle, fills with horizontal
     scan lines, then rotates the output points back.
     """
-    s = PROFESSIONAL_SETTINGS
+    s = _get_settings(settings)
     row_spacing   = row_spacing   or s['fill_density']
     stitch_length = stitch_length or s['fill_stitch_length']
 
@@ -582,23 +593,26 @@ def generate_scanline_fill(polygon: List[Tuple[float,float]],
 
 # ── underlay stitches ────────────────────────────────────────────────────────
 def generate_underlay(polygon: List[Tuple[float,float]],
-                      angle_deg: float = 0.0) -> List[Tuple[float,float]]:
-    s = PROFESSIONAL_SETTINGS
+                      angle_deg: float = 0.0,
+                      settings: Optional[dict] = None) -> List[Tuple[float,float]]:
+    s = _get_settings(settings)
     return generate_scanline_fill(polygon,
                                   row_spacing=s['underlay_density'],
                                   stitch_length=4.0,
-                                  angle_deg=angle_deg)
+                                  angle_deg=angle_deg,
+                                  settings=settings)
 
 # ── satin column ────────────────────────────────────────────────────────────
 def generate_satin_column(path_pts: List[Tuple[float,float]],
-                           width_mm: float = 3.0) -> List[Tuple[float,float]]:
+                           width_mm: float = 3.0,
+                           settings: Optional[dict] = None) -> List[Tuple[float,float]]:
     """
     Generate proper satin column stitches along a path.
     Each stitch crosses the path perpendicularly by ±width/2.
     """
     if len(path_pts) < 2:
         return []
-    s = PROFESSIONAL_SETTINGS
+    s = _get_settings(settings)
     sl = max(s['satin_stitch_length'], 0.3)
 
     # Re-sample path to equal-spacing points
@@ -645,8 +659,10 @@ def generate_satin_column(path_pts: List[Tuple[float,float]],
 
 # ── running stitch ───────────────────────────────────────────────────────────
 def generate_running_stitches(pts: List[Tuple[float,float]],
-                               stitch_length: float = None) -> List[Tuple[float,float]]:
-    sl = stitch_length or PROFESSIONAL_SETTINGS['running_stitch_length']
+                               stitch_length: float = None,
+                               settings: Optional[dict] = None) -> List[Tuple[float,float]]:
+    s = _get_settings(settings)
+    sl = stitch_length or s['running_stitch_length']
     if len(pts) < 2:
         return pts[:]
     out = [pts[0]]
@@ -662,9 +678,10 @@ def generate_running_stitches(pts: List[Tuple[float,float]],
     return out
 
 # ── stitch limit & trim ──────────────────────────────────────────────────────
-def _cap_stitch_distance(stitches, max_mm=None):
+def _cap_stitch_distance(stitches, max_mm=None, settings=None):
     """Insert JUMP positions where consecutive stitches exceed max distance."""
-    max_mm = max_mm or PROFESSIONAL_SETTINGS['max_stitch_length']
+    s = _get_settings(settings)
+    max_mm = max_mm or s['max_stitch_length']
     if not stitches:
         return stitches
     out = [stitches[0]]
@@ -694,14 +711,14 @@ _FILL_ANGLES = {
 def _fill_angle_for(color: str) -> float:
     return _FILL_ANGLES.get(color.lower(), 45.0)
 
-def add_svg_to_pattern(pattern, svg_content: str):
+def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = None):
     """Convert SVG to pyembroidery pattern with correct colours, satin & fill."""
     elements, svg_w, svg_h = extract_svg_elements_v2(svg_content)
     if not elements:
         print("No elements found in SVG")
         return
 
-    s = PROFESSIONAL_SETTINGS
+    s = _get_settings(settings)
     stitch_blocks = []   # [{'color': str, 'stitches': [...], 'type': str}]
 
     for el in elements:
@@ -719,7 +736,7 @@ def add_svg_to_pattern(pattern, svg_content: str):
                 continue
             # Apply transform then scale to mm
             transformed = _apply_matrix(subpath, mat)
-            scaled       = scale_coords(transformed, svg_w, svg_h)
+            scaled       = scale_coords(transformed, svg_w, svg_h, settings=settings)
             if len(scaled) < 2:
                 continue
 
@@ -734,14 +751,14 @@ def add_svg_to_pattern(pattern, svg_content: str):
 
                 if narrow < s['satin_width_threshold']:
                     # Satin for narrow shapes (legs, narrow body segments)
-                    stitches = generate_satin_column(scaled, width_mm=max(1.0, narrow*0.9))
+                    stitches = generate_satin_column(scaled, width_mm=max(1.0, narrow*0.9), settings=settings)
                 else:
                     # Underlay + tatami fill for wide shapes
-                    underlay = generate_underlay(closed, angle_deg=angle+90)
-                    fill_st  = generate_scanline_fill(closed, angle_deg=angle)
+                    underlay = generate_underlay(closed, angle_deg=angle+90, settings=settings)
+                    fill_st  = generate_scanline_fill(closed, angle_deg=angle, settings=settings)
                     stitches = underlay + fill_st
 
-                stitches = _cap_stitch_distance(stitches)
+                stitches = _cap_stitch_distance(stitches, settings=settings)
                 if stitches:
                     stitch_blocks.append({'color': fill,
                                           'stitches': stitches,
@@ -749,15 +766,15 @@ def add_svg_to_pattern(pattern, svg_content: str):
 
             # ── stroked outline ──────────────────────────────────────────
             if stroke and stroke != 'none' and sw > 0:
-                sw_mm = sw * PROFESSIONAL_SETTINGS['target_width_mm'] / max(svg_w, svg_h)
+                sw_mm = sw * s['target_width_mm'] / max(svg_w, svg_h)
                 if sw_mm >= s['satin_width_threshold'] * 0.5:
                     # Wide stroke → satin column
-                    stitches = generate_satin_column(scaled, width_mm=max(1.0, sw_mm))
+                    stitches = generate_satin_column(scaled, width_mm=max(1.0, sw_mm), settings=settings)
                 else:
                     # Thin stroke → running stitch
-                    stitches = generate_running_stitches(scaled)
+                    stitches = generate_running_stitches(scaled, settings=settings)
 
-                stitches = _cap_stitch_distance(stitches)
+                stitches = _cap_stitch_distance(stitches, settings=settings)
                 if stitches:
                     stitch_blocks.append({'color': stroke,
                                           'stitches': stitches,
@@ -810,12 +827,12 @@ def add_svg_to_pattern(pattern, svg_content: str):
     # End of pattern
     pattern.add_stitch_absolute(pyembroidery.END, 0, 0)
 
-def convert_svg_to_vp3(svg_content: str) -> bytes:
+def convert_svg_to_vp3(svg_content: str, settings: Optional[dict] = None) -> bytes:
     """Convert SVG content to VP3 embroidery format (primary public API)."""
-    vp3, _ = convert_svg_to_vp3_with_pattern(svg_content)
+    vp3, _ = convert_svg_to_vp3_with_pattern(svg_content, settings=settings)
     return vp3
 
-def convert_svg_to_vp3_with_pattern(svg_content: str):
+def convert_svg_to_vp3_with_pattern(svg_content: str, settings: Optional[dict] = None):
     """Convert SVG to VP3 and also return the pyembroidery pattern object.
     Returns (vp3_bytes, pattern_or_None)."""
     if not PYEMBROIDERY_AVAILABLE:
@@ -823,7 +840,7 @@ def convert_svg_to_vp3_with_pattern(svg_content: str):
 
     try:
         pattern = pyembroidery.EmbPattern()
-        add_svg_to_pattern(pattern, svg_content)
+        add_svg_to_pattern(pattern, svg_content, settings=settings)
 
         buf = BytesIO()
         pyembroidery.write_vp3(pattern, buf)
@@ -905,7 +922,7 @@ def optimize_stitch_order(stitch_blocks):
     return result
 
 # ── simple VP3 fallback (no pyembroidery) ───────────────────────────────────
-def create_simple_vp3_file(svg_content: str) -> bytes:
+def create_simple_vp3_file(svg_content: str, settings: Optional[dict] = None) -> bytes:
     """Create a minimal VP3 without pyembroidery (fallback path)."""
     try:
         elements, svg_w, svg_h = extract_svg_elements_v2(svg_content)
@@ -914,8 +931,8 @@ def create_simple_vp3_file(svg_content: str) -> bytes:
             if el['fill'] == 'none':
                 continue
             for sp in element_to_subpaths(el):
-                scaled = scale_coords(_apply_matrix(sp, el['matrix']), svg_w, svg_h)
-                all_stitches.extend(generate_scanline_fill(scaled))
+                scaled = scale_coords(_apply_matrix(sp, el['matrix']), svg_w, svg_h, settings=settings)
+                all_stitches.extend(generate_scanline_fill(scaled, settings=settings))
         if not all_stitches:
             return create_default_vp3_file()
         return create_vp3_file_with_stitches(all_stitches, ['#000000'])

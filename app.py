@@ -1,11 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import base64
+import json
 import traceback
 from io import BytesIO
-from core.converter import convert_svg_to_vp3_with_pattern, count_stitches_in_vp3, assess_embroidery_quality
+from core.converter import convert_svg_to_vp3_with_pattern, count_stitches_in_vp3, assess_embroidery_quality, PROFESSIONAL_SETTINGS
 
 try:
     import pyembroidery
@@ -22,6 +23,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Settings metadata for the frontend (key, label, min, max, step, unit)
+SETTINGS_META = [
+    {"key": "fill_density",          "label": "Fill Density",           "min": 0.5, "max": 10.0,  "step": 0.1, "unit": "mm"},
+    {"key": "fill_stitch_length",    "label": "Fill Stitch Length",     "min": 0.5, "max": 10.0,  "step": 0.1, "unit": "mm"},
+    {"key": "satin_stitch_length",   "label": "Satin Stitch Length",    "min": 0.1, "max": 3.0,   "step": 0.05,"unit": "mm"},
+    {"key": "running_stitch_length", "label": "Running Stitch Length",  "min": 0.5, "max": 10.0,  "step": 0.1, "unit": "mm"},
+    {"key": "underlay_density",      "label": "Underlay Density",       "min": 1.0, "max": 15.0,  "step": 0.5, "unit": "mm"},
+    {"key": "max_stitch_length",     "label": "Max Stitch Length",      "min": 3.0, "max": 30.0,  "step": 0.5, "unit": "mm"},
+    {"key": "min_stitch_length",     "label": "Min Stitch Length",      "min": 0.1, "max": 2.0,   "step": 0.05,"unit": "mm"},
+    {"key": "satin_width_threshold", "label": "Satin Width Threshold",  "min": 1.0, "max": 20.0,  "step": 0.5, "unit": "mm"},
+    {"key": "underlay_angle",        "label": "Underlay Angle",         "min": 0,   "max": 180,   "step": 5,   "unit": "°"},
+    {"key": "target_width_mm",       "label": "Target Design Width",    "min": 20.0,"max": 300.0, "step": 5.0, "unit": "mm"},
+]
+
+@app.get("/api/settings")
+async def get_settings():
+    """Return current default settings and their metadata."""
+    return JSONResponse({
+        "defaults": PROFESSIONAL_SETTINGS,
+        "meta": SETTINGS_META,
+    })
 
 def _generate_preview_svg(pattern) -> str:
     """Generate a base64-encoded SVG preview from a pyembroidery EmbPattern.
@@ -109,12 +132,20 @@ def _generate_preview_svg(pattern) -> str:
     return ""
 
 @app.post("/api/convert")
-async def convert_svg(file: UploadFile = File(...)):
+async def convert_svg(file: UploadFile = File(...), settings: str = Form(default="")):
     if not file.filename.endswith('.svg') and file.content_type != 'image/svg+xml':
         # Accept if either condition is met, sometimes browser doesn't send correct content type
         if not file.filename.endswith('.svg'):
             raise HTTPException(status_code=400, detail="Invalid SVG file")
     
+    # Parse optional settings override
+    user_settings = None
+    if settings:
+        try:
+            user_settings = json.loads(settings)
+        except json.JSONDecodeError:
+            pass
+
     try:
         content = await file.read()
         try:
@@ -122,7 +153,7 @@ async def convert_svg(file: UploadFile = File(...)):
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="Invalid SVG file encoding")
         
-        vp3_content, pattern = convert_svg_to_vp3_with_pattern(svg_content)
+        vp3_content, pattern = convert_svg_to_vp3_with_pattern(svg_content, settings=user_settings)
         
         if not vp3_content:
             raise HTTPException(status_code=500, detail="Conversion failed")
