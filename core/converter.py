@@ -402,7 +402,7 @@ def _traverse(elem, parent_props: dict, parent_mat: List[float],
     """Yield (elem, effective_style_props, accumulated_matrix) for shape elements."""
     if depth > 30:
         return
-    raw_tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+    raw_tag = (elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag).lower()
     props = _elem_style(elem, parent_props, css_classes)
     mat = _mat_mul(parent_mat, _parse_transform(elem.get('transform','')))
 
@@ -423,11 +423,22 @@ def extract_svg_elements_v2(svg_content: str):
         print(f"SVG parse error: {e}")
         return [], 100, 100
 
-    vb = root.get('viewBox','0 0 100 100').split()
-    svg_w = float(vb[2]) if len(vb) >= 4 else 100.0
-    svg_h = float(vb[3]) if len(vb) >= 4 else 100.0
-
     css_classes = _parse_svg_css(svg_content)
+
+    # Detect dimensions: viewBox > width/height > default 100
+    vb_attr = root.get('viewBox')
+    w_attr = root.get('width')
+    h_attr = root.get('height')
+    
+    if vb_attr:
+        parts = vb_attr.replace(',',' ').split()
+        svg_w = float(parts[2]) if len(parts) >= 4 else 100.0
+        svg_h = float(parts[3]) if len(parts) >= 4 else 100.0
+    elif w_attr and h_attr:
+        svg_w = _safe_float(w_attr, 100.0)
+        svg_h = _safe_float(h_attr, 100.0)
+    else:
+        svg_w, svg_h = 100.0, 100.0
 
     elements = []
     for elem, props, mat, tag in _traverse(root, {}, _identity(), css_classes):
@@ -454,6 +465,10 @@ def extract_svg_elements_v2(svg_content: str):
             'r':   _safe_float(elem.get('r','0')),
             'rx':  _safe_float(elem.get('rx','0')),
             'ry':  _safe_float(elem.get('ry','0')),
+            'x1':  _safe_float(elem.get('x1','0')),
+            'y1':  _safe_float(elem.get('y1','0')),
+            'x2':  _safe_float(elem.get('x2','0')),
+            'y2':  _safe_float(elem.get('y2','0')),
             'points': elem.get('points',''),
             'svg_width':  svg_w,
             'svg_height': svg_h,
@@ -492,7 +507,7 @@ def element_to_subpaths(el: dict) -> List[List[Tuple[float,float]]]:
             pts.append(pts[0])
         return [pts] if pts else []
     elif tag == 'line':
-        return [[(el.get('x1',0),el.get('y1',0)),(el.get('x2',100),el.get('y2',100))]]
+        return [[(el['x1'], el['y1']), (el['x2'], el['y2'])]]
     return []
 
 # ── coordinate scaling ───────────────────────────────────────────────────────
@@ -721,9 +736,10 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
     s = _get_settings(settings)
     stitch_blocks = []   # [{'color': str, 'stitches': [...], 'type': str}]
 
-    for el in elements:
+    for i, el in enumerate(elements):
         subpaths = element_to_subpaths(el)
         if not subpaths:
+            print(f"Element {i} ({el['tag']}) produced no subpaths")
             continue
 
         mat  = el['matrix']
@@ -763,6 +779,8 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
                     stitch_blocks.append({'color': fill,
                                           'stitches': stitches,
                                           'type': 'fill'})
+                else:
+                    print(f"Element {i} ({el['tag']}) fill produced 0 stitches (narrow={narrow:.2f}mm)")
 
             # ── stroked outline ──────────────────────────────────────────
             if stroke and stroke != 'none' and sw > 0:
@@ -779,6 +797,8 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
                     stitch_blocks.append({'color': stroke,
                                           'stitches': stitches,
                                           'type': 'stroke'})
+                else:
+                    print(f"Element {i} ({el['tag']}) stroke produced 0 stitches")
 
     if not stitch_blocks:
         print("No stitch blocks generated")

@@ -5,29 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ur/gd Studios: stitch</title>
-
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="stitch - SVG to VP3 Converter">
+    <meta property="og:title" content="stitch - SVG/Image to VP3 Converter">
     <meta property="og:description"
-        content="Convert SVG files to VP3 embroidery format instantly. Professional SVG to VP3 converter powered by ur/gd Studios.">
+        content="Convert SVG or raster images to VP3 embroidery format. Powered by vtracer + ur/gd Studios.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ur/gd Studios">
-
-    <!-- Additional Meta Tags -->
     <meta name="author" content="ur/gd Studios">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="/" id="canonical-url">
-
     <style>
         @font-face {
             font-family: 'Archivo';
-            src: url('Archivo-Bold.ttf') format('truetype');
+            src: url('assets/Archivo-Bold.ttf') format('truetype');
             font-weight: bold;
         }
 
         @font-face {
             font-family: 'Rubik';
-            src: url('Rubik-Regular.ttf') format('truetype');
+            src: url('assets/Rubik-Regular.ttf') format('truetype');
             font-weight: normal;
         }
 
@@ -42,10 +37,9 @@
             background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 20px;
-            position: relative;
+            padding: 30px 20px;
         }
 
         .container {
@@ -54,18 +48,14 @@
             -webkit-backdrop-filter: blur(25px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 20px;
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
             padding: 40px;
-            max-width: 500px;
+            max-width: 640px;
             width: 100%;
             text-align: center;
             position: relative;
         }
 
-        /* Liquid glass highlight layer */
         .container::before {
             content: '';
             position: absolute;
@@ -73,18 +63,12 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg,
-                    rgba(255, 255, 255, 0.12) 0%,
-                    rgba(255, 255, 255, 0.03) 30%,
-                    transparent 50%,
-                    rgba(255, 255, 255, 0.02) 70%,
-                    rgba(255, 255, 255, 0.08) 100%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 30%, transparent 50%, rgba(255, 255, 255, 0.02) 70%, rgba(255, 255, 255, 0.08) 100%);
             border-radius: 20px;
             pointer-events: none;
             z-index: 1;
         }
 
-        /* Additional glass reflection layer */
         .container::after {
             content: '';
             position: absolute;
@@ -92,16 +76,12 @@
             left: 0;
             right: 0;
             height: 40%;
-            background: linear-gradient(180deg,
-                    rgba(255, 255, 255, 0.1) 0%,
-                    rgba(255, 255, 255, 0.02) 50%,
-                    transparent 100%);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 50%, transparent 100%);
             border-radius: 20px 20px 0 0;
             pointer-events: none;
             z-index: 1;
         }
 
-        /* Ensure content stays above mirror effect */
         .container>* {
             position: relative;
             z-index: 2;
@@ -123,11 +103,12 @@
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
         }
 
+        /* ── upload area ── */
         .upload-area {
             border: 3px dashed rgba(255, 255, 255, 0.15);
             border-radius: 15px;
-            padding: 40px 20px;
-            margin: 30px 0;
+            padding: 36px 20px;
+            margin: 24px 0;
             transition: all 0.3s ease;
             cursor: pointer;
             background: rgba(255, 255, 255, 0.02);
@@ -149,20 +130,20 @@
         }
 
         .upload-icon {
-            font-size: 3rem;
+            font-size: 2.8rem;
             color: rgba(255, 255, 255, 0.6);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .upload-text {
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .upload-hint {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
         }
 
         #fileInput {
@@ -170,56 +151,225 @@
         }
 
         .file-info {
-            margin: 20px 0;
-            padding: 15px;
+            margin: 16px 0;
+            padding: 14px;
             background: rgba(102, 126, 234, 0.1);
             border-radius: 10px;
             display: none;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(102, 126, 234, 0.2);
         }
 
         .file-name {
             font-weight: bold;
             color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .file-size {
             color: rgba(255, 255, 255, 0.6);
-            font-size: 0.9rem;
+            font-size: 0.88rem;
         }
 
-        .convert-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .mode-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.76rem;
+            font-weight: bold;
+            letter-spacing: 0.4px;
+        }
+
+        .mode-badge.svg {
+            background: rgba(102, 126, 234, 0.25);
+            color: #a5b4fc;
+            border: 1px solid rgba(102, 126, 234, 0.4);
+        }
+
+        .mode-badge.raster {
+            background: rgba(118, 75, 162, 0.25);
+            color: #c084fc;
+            border: 1px solid rgba(118, 75, 162, 0.4);
+        }
+
+        /* ── collapsible param panels ── */
+        .param-panel {
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin: 14px 0;
+            text-align: left;
+            display: none;
+        }
+
+        .param-panel.vtracer {
+            background: rgba(118, 75, 162, 0.09);
+            border: 1px solid rgba(118, 75, 162, 0.28);
+        }
+
+        .param-panel.vp3 {
+            background: rgba(102, 126, 234, 0.09);
+            border: 1px solid rgba(102, 126, 234, 0.28);
+        }
+
+        .panel-title {
+            color: rgba(255, 255, 255, 0.88);
+            font-weight: bold;
+            font-size: 0.92rem;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .panel-title .chevron {
+            transition: transform 0.22s ease;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .panel-title.collapsed .chevron {
+            transform: rotate(-90deg);
+        }
+
+        .panel-body {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 13px;
+        }
+
+        @media(max-width:520px) {
+            .panel-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .param-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .param-group.full-width {
+            grid-column: 1/-1;
+        }
+
+        .param-label {
+            font-size: 0.76rem;
+            color: rgba(255, 255, 255, 0.55);
+            letter-spacing: 0.3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .param-label span.val {
+            color: #c084fc;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .param-label span.val.blue {
+            color: #818cf8;
+        }
+
+        .param-group select,
+        .param-group input[type=range] {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.84rem;
+            padding: 6px 10px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .param-panel.vp3 .param-group select,
+        .param-panel.vp3 .param-group input[type=range] {
+            accent-color: #667eea;
+        }
+
+        .param-panel.vtracer .param-group select,
+        .param-panel.vtracer .param-group input[type=range] {
+            accent-color: #764ba2;
+        }
+
+        .param-group select:focus,
+        .param-group input[type=range]:focus {
+            border-color: #667eea;
+        }
+
+        .param-group select option {
+            background: #1a1a2e;
+        }
+
+        input[type=range] {
+            padding: 4px 0;
+            cursor: pointer;
+        }
+
+        .reset-btn {
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            color: rgba(255, 255, 255, 0.45);
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 0.76rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* ── buttons ── */
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .btn {
             color: white;
             border: none;
-            padding: 15px 40px;
+            padding: 14px 30px;
             border-radius: 50px;
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin: 20px 0;
-            min-width: 200px;
-            box-shadow:
-                0 8px 25px rgba(102, 126, 234, 0.25),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            min-width: 150px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
         }
 
-        .convert-btn:hover:not(:disabled) {
+        .btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow:
-                0 12px 35px rgba(102, 126, 234, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
-        .convert-btn:disabled {
-            opacity: 0.6;
+        .btn:disabled {
+            opacity: 0.55;
             cursor: not-allowed;
         }
 
+        .btn-purple {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-violet {
+            background: linear-gradient(135deg, #764ba2 0%, #9b59b6 100%);
+            box-shadow: 0 8px 25px rgba(118, 75, 162, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        /* ── progress ── */
         .progress-container {
             margin: 20px 0;
             display: none;
@@ -231,7 +381,7 @@
             background: rgba(255, 255, 255, 0.08);
             border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .progress-fill {
@@ -242,249 +392,156 @@
         }
 
         .progress-text {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.88rem;
+            margin-bottom: 14px;
         }
 
-        .preview-area {
-            margin: 20px 0;
-            padding: 20px;
-            background: rgba(102, 126, 234, 0.06);
-            border-radius: 15px;
+        .cancel-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ff8787;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cancel-btn:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ff6b6b;
+        }
+
+        /* ── preview areas ── */
+        .preview-box {
+            margin: 16px 0;
+            padding: 18px;
+            border-radius: 14px;
             display: none;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(102, 126, 234, 0.18);
             text-align: center;
         }
 
-        .preview-title {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.95rem;
-            font-weight: bold;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+        .preview-box.svg-prev {
+            background: rgba(118, 75, 162, 0.07);
+            border: 1px solid rgba(118, 75, 162, 0.2);
         }
 
-        .preview-area img {
+        .preview-box.stitch-prev {
+            background: rgba(102, 126, 234, 0.06);
+            border: 1px solid rgba(102, 126, 234, 0.18);
+        }
+
+        .preview-box-title {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.88rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .preview-box img {
             max-width: 100%;
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
             transition: transform 0.3s ease;
         }
 
-        .preview-area img:hover {
-            transform: scale(1.03);
+        .preview-box img:hover {
+            transform: scale(1.02);
         }
 
+        /* ── downloads ── */
         .download-area {
-            margin: 20px 0;
-            padding: 20px;
+            margin: 16px 0;
+            padding: 18px;
             background: rgba(34, 197, 94, 0.1);
-            border-radius: 10px;
+            border-radius: 12px;
             display: none;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(34, 197, 94, 0.2);
         }
 
-        .download-btn {
-            background: #4CAF50;
+        .download-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .download-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .dl-btn {
             color: white;
             border: none;
-            padding: 12px 30px;
+            padding: 11px 24px;
             border-radius: 25px;
-            font-size: 1rem;
+            font-size: 0.92rem;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            margin: 10px 0;
             transition: all 0.3s ease;
+        }
+
+        .dl-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .dl-btn.vp3 {
+            background: #4CAF50;
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
 
-        .download-btn:hover {
+        .dl-btn.vp3:hover {
             background: #45a049;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
         }
 
+        .dl-btn.svg {
+            background: #764ba2;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+        }
+
+        .dl-btn.svg:hover {
+            background: #5e3990;
+        }
+
+        /* ── messages ── */
         .error {
             background: rgba(239, 68, 68, 0.1);
             color: #ff6b6b;
-            padding: 15px;
+            padding: 14px;
             border-radius: 10px;
-            margin: 20px 0;
+            margin: 16px 0;
             display: none;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
         .success {
             background: rgba(34, 197, 94, 0.1);
             color: #51cf66;
-            padding: 15px;
+            padding: 14px;
             border-radius: 10px;
-            margin: 20px 0;
+            margin: 16px 0;
             display: none;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(34, 197, 94, 0.2);
         }
 
-        /* Settings Panel Styles */
-        .settings-panel {
-            margin: 20px 0;
-            text-align: left;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .settings-header {
-            padding: 12px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 0.9rem;
-            user-select: none;
-        }
-
-        .settings-header:hover {
-            background: rgba(255, 255, 255, 0.08);
-        }
-
-        .settings-content {
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 15px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .setting-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .setting-label-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .setting-label {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.85rem;
-        }
-
-        .setting-controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .setting-slider {
-            flex: 1;
-            height: 4px;
-            -webkit-appearance: none;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            outline: none;
-        }
-
-        .setting-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            background: #667eea;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
-        }
-
-        .setting-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-            background: #764ba2;
-        }
-
-        .setting-input {
-            width: 70px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            color: white;
-            padding: 4px 8px;
-            font-size: 0.85rem;
-            text-align: right;
-            outline: none;
-        }
-
-        .setting-input:focus {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-        }
-
-        .setting-unit {
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 0.75rem;
-            margin-left: 4px;
-        }
-
-        .settings-content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .settings-content::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .settings-content::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-        }
-
-        .settings-content::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .footer {
-            margin-top: 30px;
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 0.9rem;
-        }
-
-        .footer a {
-            color: #667eea;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-
-        .footer a:hover {
-            color: #764ba2;
-        }
-
-        /* Loading animation */
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 17px;
+            height: 17px;
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             border-top-color: white;
             animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
+            margin-right: 8px;
+            vertical-align: middle;
         }
 
         @keyframes spin {
@@ -493,15 +550,6 @@
             }
         }
 
-        /* Responsive design */
-        @media (max-width: 600px) {
-            .container {
-                padding: 30px 20px;
-                margin: 10px;
-            }
-        }
-
-        /* Accessibility styles */
         .skip-link {
             position: absolute;
             top: -40px;
@@ -517,19 +565,13 @@
             top: 6px;
         }
 
-        .convert-btn:focus,
-        .download-btn:focus,
-        #fileInput:focus {
-            outline: 2px solid #00ff88;
-            outline-offset: 2px;
+        @media(max-width:600px) {
+            .container {
+                padding: 28px 18px;
+            }
         }
 
-        .upload-area:focus-within {
-            outline: 2px solid #00ff88;
-            outline-offset: 2px;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
+        @media(prefers-reduced-motion:reduce) {
             * {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
@@ -543,49 +585,198 @@
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="container" id="main-content">
         <div class="logo">🧵 stitch</div>
-        <div class="subtitle">Convert SVG files to VP3 embroidery format</div>
+        <div class="subtitle">Convert SVG or images to VP3 embroidery format</div>
 
-        <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload SVG file area">
+        <!-- Upload -->
+        <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload file">
             <div class="upload-icon">📁</div>
-            <div class="upload-text">Click to select SVG file</div>
-            <div class="upload-hint">or drag and drop here</div>
-            <input type="file" id="fileInput" accept=".svg" aria-label="Select SVG file to convert" />
+            <div class="upload-text">Click to select a file</div>
+            <div class="upload-hint">SVG · PNG · JPG · BMP · GIF · TIFF · WebP — or drag &amp; drop</div>
+            <input type="file" id="fileInput" accept=".svg,.png,.jpg,.jpeg,.bmp,.gif,.tiff,.tif,.webp,image/*"
+                aria-label="Select file" />
         </div>
 
+        <!-- File info -->
         <div class="file-info" id="fileInfo">
             <div class="file-name" id="fileName"></div>
             <div class="file-size" id="fileSize"></div>
+            <div id="modeBadge"></div>
         </div>
 
-        <div class="settings-panel" id="settingsPanel">
-            <div class="settings-header" id="settingsHeader">
-                <span>⚙️ Advanced Settings</span>
-                <span id="settingsToggle">expand_more</span>
+        <!-- ① vtracer params (raster only) -->
+        <div class="param-panel vtracer" id="vtracerPanel">
+            <div class="panel-title" id="vtracerToggle"><span class="chevron">▾</span> 🎛 vtracer — tracing parameters
             </div>
-            <div class="settings-content" id="settingsContent" style="display: none;">
-                <!-- Dynamically populated -->
+            <div class="panel-body" id="vtracerBody">
+                <div class="param-group">
+                    <label class="param-label" for="vt_colormode">Color mode</label>
+                    <select id="vt_colormode">
+                        <option value="color">color</option>
+                        <option value="binary">binary</option>
+                    </select>
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_hierarchical">Hierarchical</label>
+                    <select id="vt_hierarchical">
+                        <option value="stacked">stacked</option>
+                        <option value="cutout">cutout</option>
+                    </select>
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_mode">Path mode</label>
+                    <select id="vt_mode">
+                        <option value="spline">spline</option>
+                        <option value="polygon">polygon</option>
+                        <option value="none">none</option>
+                    </select>
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_filter_speckle">Filter speckle <span class="val"
+                            id="vv_filter_speckle">4</span> px</label>
+                    <input type="range" id="vt_filter_speckle" min="0" max="16" value="4" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_color_precision">Color precision <span class="val"
+                            id="vv_color_precision">6</span> bits</label>
+                    <input type="range" id="vt_color_precision" min="1" max="8" value="6" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_layer_difference">Layer difference <span class="val"
+                            id="vv_layer_difference">16</span></label>
+                    <input type="range" id="vt_layer_difference" min="1" max="64" value="16" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_corner_threshold">Corner threshold <span class="val"
+                            id="vv_corner_threshold">60</span>°</label>
+                    <input type="range" id="vt_corner_threshold" min="1" max="180" value="60" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_splice_threshold">Splice threshold <span class="val"
+                            id="vv_splice_threshold">45</span>°</label>
+                    <input type="range" id="vt_splice_threshold" min="1" max="180" value="45" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_length_threshold">Length threshold <span class="val"
+                            id="vv_length_threshold">4.0</span></label>
+                    <input type="range" id="vt_length_threshold" min="1" max="10" value="4" step="0.5">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_max_iterations">Max iterations <span class="val"
+                            id="vv_max_iterations">10</span></label>
+                    <input type="range" id="vt_max_iterations" min="1" max="20" value="10" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vt_path_precision">Path precision <span class="val"
+                            id="vv_path_precision">8</span></label>
+                    <input type="range" id="vt_path_precision" min="1" max="10" value="8" step="1">
+                </div>
+                <div class="param-group full-width" style="align-items:flex-end;">
+                    <button class="reset-btn" id="resetVtracer">↺ Reset vtracer defaults</button>
+                </div>
             </div>
         </div>
 
-        <button class="convert-btn" id="convertBtn" role="button" aria-label="Convert selected SVG file to VP3 format"
-            disabled>Convert to VP3</button>
+        <!-- ② VP3 stitch params (always shown when file selected) -->
+        <div class="param-panel vp3" id="vp3Panel">
+            <div class="panel-title" id="vp3Toggle"><span class="chevron">▾</span> 🪡 VP3 — stitch parameters</div>
+            <div class="panel-body" id="vp3Body">
+                <div class="param-group">
+                    <label class="param-label" for="vp_fill_density">Fill density <span class="val blue"
+                            id="vv_fill_density">2.0</span> mm</label>
+                    <input type="range" id="vp_fill_density" min="0.5" max="6" value="2" step="0.1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_fill_stitch_length">Fill stitch length <span class="val blue"
+                            id="vv_fill_stitch_length">3.0</span> mm</label>
+                    <input type="range" id="vp_fill_stitch_length" min="1" max="8" value="3" step="0.1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_satin_stitch_length">Satin stitch length <span class="val blue"
+                            id="vv_satin_stitch_length">0.4</span> mm</label>
+                    <input type="range" id="vp_satin_stitch_length" min="0.1" max="2" value="0.4" step="0.05">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_running_stitch_length">Running stitch <span class="val blue"
+                            id="vv_running_stitch_length">2.5</span> mm</label>
+                    <input type="range" id="vp_running_stitch_length" min="0.5" max="8" value="2.5" step="0.1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_underlay_density">Underlay density <span class="val blue"
+                            id="vv_underlay_density">4.0</span> mm</label>
+                    <input type="range" id="vp_underlay_density" min="1" max="10" value="4" step="0.1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_max_stitch_length">Max stitch length <span class="val blue"
+                            id="vv_max_stitch_length">12.0</span> mm</label>
+                    <input type="range" id="vp_max_stitch_length" min="4" max="20" value="12" step="0.5">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_min_stitch_length">Min stitch length <span class="val blue"
+                            id="vv_min_stitch_length">0.3</span> mm</label>
+                    <input type="range" id="vp_min_stitch_length" min="0.1" max="2" value="0.3" step="0.05">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_satin_width_threshold">Satin width threshold <span
+                            class="val blue" id="vv_satin_width_threshold">8.0</span> mm</label>
+                    <input type="range" id="vp_satin_width_threshold" min="1" max="20" value="8" step="0.5">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_underlay_angle">Underlay angle <span class="val blue"
+                            id="vv_underlay_angle">90</span>°</label>
+                    <input type="range" id="vp_underlay_angle" min="0" max="180" value="90" step="1">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_target_width_mm">Target width <span class="val blue"
+                            id="vv_target_width_mm">100</span> mm</label>
+                    <input type="range" id="vp_target_width_mm" min="20" max="300" value="100" step="5">
+                </div>
+                <div class="param-group">
+                    <label class="param-label" for="vp_max_stitches_per_block">Max stitches/block <span class="val blue"
+                            id="vv_max_stitches_per_block">8000</span></label>
+                    <input type="range" id="vp_max_stitches_per_block" min="500" max="20000" value="8000" step="500">
+                </div>
+                <div class="param-group full-width" style="align-items:flex-end;">
+                    <button class="reset-btn" id="resetVp3">↺ Reset VP3 defaults</button>
+                </div>
+            </div>
+        </div>
 
-        <div class="progress-container" id="progressContainer" role="progressbar" aria-label="Conversion progress">
+        <!-- Action buttons -->
+        <div class="btn-row" id="btnRow">
+            <button class="btn btn-purple" id="convertBtn" disabled>Convert to VP3</button>
+            <button class="btn btn-violet" id="traceBtn" disabled style="display:none;">Trace to SVG</button>
+            <button class="btn btn-purple" id="traceConvertBtn" disabled style="display:none;">Trace &amp;
+                Convert</button>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
-            <div class="progress-text" id="progressText">Converting...</div>
+            <div class="progress-text" id="progressText">Working…</div>
+            <button class="cancel-btn" id="cancelBtn">Cancel Operation</button>
         </div>
 
-        <div class="preview-area" id="previewArea">
-            <div class="preview-title">🔍 Embroidery Preview</div>
+        <!-- Traced SVG preview -->
+        <div class="preview-box svg-prev" id="svgPreviewArea">
+            <div class="preview-box-title">🖼 Traced SVG</div>
+            <img id="svgPreviewImage" alt="Traced SVG preview" />
+        </div>
+
+        <!-- Stitch preview -->
+        <div class="preview-box stitch-prev" id="previewArea">
+            <div class="preview-box-title">🔍 Embroidery Preview</div>
             <img id="previewImage" alt="Embroidery stitch preview" />
         </div>
 
+        <!-- Downloads -->
         <div class="download-area" id="downloadArea">
-            <div>✅ Conversion complete!</div>
-            <a href="#" class="download-btn" id="downloadBtn" role="button"
-                aria-label="Download converted VP3 file">Download VP3 File</a>
+            <div class="download-label">✅ Ready to download</div>
+            <div class="download-row">
+                <a href="#" class="dl-btn svg" id="downloadSvgBtn" style="display:none;">⬇ Download SVG</a>
+                <a href="#" class="dl-btn vp3" id="downloadVp3Btn" style="display:none;">⬇ Download VP3</a>
+            </div>
         </div>
 
         <div class="error" id="errorMessage" role="alert" aria-live="polite"></div>
@@ -593,279 +784,382 @@
     </div>
 
     <script>
+        // ── refs ─────────────────────────────────────────────────────────────────────
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
+        const fileNameEl = document.getElementById('fileName');
+        const fileSizeEl = document.getElementById('fileSize');
+        const modeBadge = document.getElementById('modeBadge');
+        const vtracerPanel = document.getElementById('vtracerPanel');
+        const vtracerToggle = document.getElementById('vtracerToggle');
+        const vtracerBody = document.getElementById('vtracerBody');
+        const vp3Panel = document.getElementById('vp3Panel');
+        const vp3Toggle = document.getElementById('vp3Toggle');
+        const vp3Body = document.getElementById('vp3Body');
         const convertBtn = document.getElementById('convertBtn');
+        const traceBtn = document.getElementById('traceBtn');
+        const traceConvertBtn = document.getElementById('traceConvertBtn');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
-        const downloadArea = document.getElementById('downloadArea');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const svgPreviewArea = document.getElementById('svgPreviewArea');
+        const svgPreviewImage = document.getElementById('svgPreviewImage');
         const previewArea = document.getElementById('previewArea');
         const previewImage = document.getElementById('previewImage');
+        const downloadArea = document.getElementById('downloadArea');
+        const downloadSvgBtn = document.getElementById('downloadSvgBtn');
+        const downloadVp3Btn = document.getElementById('downloadVp3Btn');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
-        const settingsHeader = document.getElementById('settingsHeader');
-        const settingsContent = document.getElementById('settingsContent');
-        const settingsToggle = document.getElementById('settingsToggle');
 
-        let selectedFile = null;
-        let currentSettings = {};
-        let settingsMeta = [];
-        let isConverting = false;
-
-        // Settings toggle
-        settingsHeader.addEventListener('click', () => {
-            const isVisible = settingsContent.style.display !== 'none';
-            settingsContent.style.display = isVisible ? 'none' : 'grid';
-            settingsToggle.textContent = isVisible ? 'expand_more' : 'expand_less';
+        // ── slider live value wiring ──────────────────────────────────────────────────
+        const VTRACER_SLIDERS = [
+            ['vt_filter_speckle', 'vv_filter_speckle', v => v],
+            ['vt_color_precision', 'vv_color_precision', v => v],
+            ['vt_layer_difference', 'vv_layer_difference', v => v],
+            ['vt_corner_threshold', 'vv_corner_threshold', v => v],
+            ['vt_splice_threshold', 'vv_splice_threshold', v => v],
+            ['vt_length_threshold', 'vv_length_threshold', v => parseFloat(v).toFixed(1)],
+            ['vt_max_iterations', 'vv_max_iterations', v => v],
+            ['vt_path_precision', 'vv_path_precision', v => v],
+        ];
+        const VP3_SLIDERS = [
+            ['vp_fill_density', 'vv_fill_density', v => parseFloat(v).toFixed(1)],
+            ['vp_fill_stitch_length', 'vv_fill_stitch_length', v => parseFloat(v).toFixed(1)],
+            ['vp_satin_stitch_length', 'vv_satin_stitch_length', v => parseFloat(v).toFixed(2)],
+            ['vp_running_stitch_length', 'vv_running_stitch_length', v => parseFloat(v).toFixed(1)],
+            ['vp_underlay_density', 'vv_underlay_density', v => parseFloat(v).toFixed(1)],
+            ['vp_max_stitch_length', 'vv_max_stitch_length', v => parseFloat(v).toFixed(1)],
+            ['vp_min_stitch_length', 'vv_min_stitch_length', v => parseFloat(v).toFixed(2)],
+            ['vp_satin_width_threshold', 'vv_satin_width_threshold', v => parseFloat(v).toFixed(1)],
+            ['vp_underlay_angle', 'vv_underlay_angle', v => v],
+            ['vp_target_width_mm', 'vv_target_width_mm', v => v],
+            ['vp_max_stitches_per_block', 'vv_max_stitches_per_block', v => parseInt(v).toLocaleString()],
+        ];
+        [...VTRACER_SLIDERS, ...VP3_SLIDERS].forEach(([sid, vid, fmt]) => {
+            const sl = document.getElementById(sid);
+            const vl = document.getElementById(vid);
+            if (sl && vl) sl.addEventListener('input', () => { 
+                vl.textContent = fmt(sl.value); 
+                saveSettings();
+            });
+        });
+        ['vt_colormode', 'vt_hierarchical', 'vt_mode'].forEach(id => {
+            document.getElementById(id).addEventListener('change', saveSettings);
         });
 
-        // Initialize settings
-        async function initSettings() {
-            try {
-                const response = await fetch('/api/settings');
-                const data = await response.json();
-                currentSettings = data.defaults;
-                settingsMeta = data.meta;
-                renderSettings();
-            } catch (error) {
-                console.error('Failed to load settings:', error);
-            }
-        }
+        // ── defaults & reset ─────────────────────────────────────────────────────────
+        const VT_DEFAULTS = {
+            vt_colormode: 'color', vt_hierarchical: 'stacked', vt_mode: 'spline',
+            vt_filter_speckle: 4, vt_color_precision: 6, vt_layer_difference: 16,
+            vt_corner_threshold: 60, vt_splice_threshold: 45, vt_length_threshold: 4,
+            vt_max_iterations: 10, vt_path_precision: 8,
+        };
+        const VP3_DEFAULTS = {
+            vp_fill_density: 2, vp_fill_stitch_length: 3, vp_satin_stitch_length: 0.4,
+            vp_running_stitch_length: 2.5, vp_underlay_density: 4, vp_max_stitch_length: 12,
+            vp_min_stitch_length: 0.3, vp_satin_width_threshold: 8, vp_underlay_angle: 90,
+            vp_target_width_mm: 100, vp_max_stitches_per_block: 8000,
+        };
 
-        function renderSettings() {
-            settingsContent.innerHTML = '';
-            settingsMeta.forEach(meta => {
-                const val = currentSettings[meta.key];
-                const group = document.createElement('div');
-                group.className = 'setting-group';
-                group.innerHTML = `
-                    <div class="setting-label-row">
-                        <label class="setting-label" for="setting-${meta.key}">${meta.label}</label>
-                    </div>
-                    <div class="setting-controls">
-                        <input type="range" class="setting-slider" id="slider-${meta.key}" 
-                            min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${val}">
-                        <div style="display: flex; align-items: center;">
-                            <input type="number" class="setting-input" id="input-${meta.key}" 
-                                min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${val}">
-                            <span class="setting-unit">${meta.unit}</span>
-                        </div>
-                    </div>
-                `;
-                settingsContent.appendChild(group);
-
-                const slider = group.querySelector(`#slider-${meta.key}`);
-                const input = group.querySelector(`#input-${meta.key}`);
-
-                const update = (newVal, skipConversion = false) => {
-                    newVal = parseFloat(newVal);
-                    currentSettings[meta.key] = newVal;
-                    slider.value = newVal;
-                    input.value = newVal;
-                    
-                    if (!skipConversion && selectedFile && !isConverting) {
-                        triggerAutoConvert();
-                    }
-                };
-
-                slider.addEventListener('input', (e) => update(e.target.value));
-                input.addEventListener('change', (e) => update(e.target.value));
+        function applyDefaults(defaults, sliders) {
+            Object.entries(defaults).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) el.value = val;
+            });
+            sliders.forEach(([sid, vid, fmt]) => {
+                const sl = document.getElementById(sid);
+                const vl = document.getElementById(vid);
+                if (sl && vl) vl.textContent = fmt(sl.value);
             });
         }
-
-        let convertTimeout = null;
-        function triggerAutoConvert() {
-            if (convertTimeout) clearTimeout(convertTimeout);
-            convertTimeout = setTimeout(() => {
-                handleFileUpload(selectedFile);
-            }, 500);
+        function saveSettings() {
+            const settings = {};
+            [...VTRACER_SLIDERS, ...VP3_SLIDERS].forEach(([sid]) => {
+                settings[sid] = document.getElementById(sid).value;
+            });
+            ['vt_colormode', 'vt_hierarchical', 'vt_mode'].forEach(id => {
+                settings[id] = document.getElementById(id).value;
+            });
+            localStorage.setItem('stitch_settings', JSON.stringify(settings));
         }
 
-        initSettings();
+        function loadSettings() {
+            const raw = localStorage.getItem('stitch_settings');
+            if (!raw) return;
+            try {
+                const settings = JSON.parse(raw);
+                Object.entries(settings).forEach(([id, val]) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = val;
+                });
+                // Update labels
+                [...VTRACER_SLIDERS, ...VP3_SLIDERS].forEach(([sid, vid, fmt]) => {
+                    const sl = document.getElementById(sid);
+                    const vl = document.getElementById(vid);
+                    if (sl && vl) vl.textContent = fmt(sl.value);
+                });
+            } catch (e) { console.error('Failed to load settings', e); }
+        }
 
-        // Upload area click handler
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
+        document.getElementById('resetVtracer').addEventListener('click', () => { applyDefaults(VT_DEFAULTS, VTRACER_SLIDERS); saveSettings(); });
+        document.getElementById('resetVp3').addEventListener('click', () => { applyDefaults(VP3_DEFAULTS, VP3_SLIDERS); saveSettings(); });
+
+        loadSettings();
+
+        // ── collapsible panels ────────────────────────────────────────────────────────
+        function makeToggle(titleEl, bodyEl) {
+            titleEl.addEventListener('click', () => {
+                const collapsed = titleEl.classList.toggle('collapsed');
+                bodyEl.style.display = collapsed ? 'none' : 'grid';
+            });
+        }
+        makeToggle(vtracerToggle, vtracerBody);
+        makeToggle(vp3Toggle, vp3Body);
+
+        // ── file handling ─────────────────────────────────────────────────────────────
+        const SVG_EXT = /\.svg$/i;
+        const RASTER_EXT = /\.(png|jpe?g|bmp|gif|tiff?|webp)$/i;
+
+        function classifyFile(file) {
+            if (SVG_EXT.test(file.name) || file.type === 'image/svg+xml') return 'svg';
+            if (RASTER_EXT.test(file.name) || (file.type.startsWith('image/') && file.type !== 'image/svg+xml')) return 'raster';
+            return null;
+        }
+
+        let selectedFile = null;
+        let fileMode = null;
+
+        function handleFileSelected(file) {
+            const mode = classifyFile(file);
+            if (!mode) { showError('Unsupported file. Use SVG, PNG, JPG, BMP, GIF, TIFF, or WebP.'); return; }
+            selectedFile = file;
+            fileNameEl.textContent = file.name;
+            fileSizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            fileInfo.style.display = 'block';
+            fileMode = mode;
+            hideMessages(); hideResults();
+
+            if (mode === 'svg') {
+                modeBadge.innerHTML = '<span class="mode-badge svg">SVG → VP3</span>';
+                convertBtn.style.display = 'inline-block'; convertBtn.disabled = false;
+                traceBtn.style.display = 'none';
+                traceConvertBtn.style.display = 'none';
+                vtracerPanel.style.display = 'none';
+                vp3Panel.style.display = 'block';
+                
+                // Show immediate preview of the uploaded SVG
+                const reader = new FileReader();
+                reader.onload = e => showSvgPreview(btoa(e.target.result), 'Uploaded SVG');
+                reader.readAsText(file);
+            } else {
+                modeBadge.innerHTML = '<span class="mode-badge raster">Image → SVG → VP3 via vtracer</span>';
+                convertBtn.style.display = 'none';
+                traceBtn.style.display = 'inline-block'; traceBtn.disabled = false;
+                traceConvertBtn.style.display = 'inline-block'; traceConvertBtn.disabled = false;
+                vtracerPanel.style.display = 'block';
+                vp3Panel.style.display = 'block';
+                // ensure both panels open
+                [vtracerToggle, vp3Toggle].forEach(t => { t.classList.remove('collapsed'); });
+                [vtracerBody, vp3Body].forEach(b => { b.style.display = 'grid'; });
+
+                // Show raster preview
+                const reader = new FileReader();
+                reader.onload = e => {
+                    svgPreviewImage.src = e.target.result;
+                    svgPreviewArea.querySelector('.preview-box-title').textContent = '🖼 Source Image';
+                    svgPreviewArea.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+        fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFileSelected(e.target.files[0]); });
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault(); uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFileSelected(e.dataTransfer.files[0]);
         });
 
-        // File input change handler
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.type === 'image/svg+xml') {
-                selectedFile = file;
-                fileName.textContent = file.name;
-                fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
-                fileInfo.style.display = 'block';
-                convertBtn.disabled = false;
-                hideMessages();
-            } else {
-                showError('Please select a valid SVG file');
+        // ── FormData builders ─────────────────────────────────────────────────────────
+        function vtracerFormData() {
+            const fd = new FormData();
+            fd.append('file', selectedFile);
+            fd.append('colormode', document.getElementById('vt_colormode').value);
+            fd.append('hierarchical', document.getElementById('vt_hierarchical').value);
+            fd.append('mode', document.getElementById('vt_mode').value);
+            fd.append('filter_speckle', document.getElementById('vt_filter_speckle').value);
+            fd.append('color_precision', document.getElementById('vt_color_precision').value);
+            fd.append('layer_difference', document.getElementById('vt_layer_difference').value);
+            fd.append('corner_threshold', document.getElementById('vt_corner_threshold').value);
+            fd.append('length_threshold', document.getElementById('vt_length_threshold').value);
+            fd.append('max_iterations', document.getElementById('vt_max_iterations').value);
+            fd.append('splice_threshold', document.getElementById('vt_splice_threshold').value);
+            fd.append('path_precision', document.getElementById('vt_path_precision').value);
+            return fd;
+        }
+
+        function vp3FormData(fd = new FormData()) {
+            if (!fd.has('file')) fd.append('file', selectedFile);
+            fd.append('fill_density', document.getElementById('vp_fill_density').value);
+            fd.append('fill_stitch_length', document.getElementById('vp_fill_stitch_length').value);
+            fd.append('satin_stitch_length', document.getElementById('vp_satin_stitch_length').value);
+            fd.append('running_stitch_length', document.getElementById('vp_running_stitch_length').value);
+            fd.append('underlay_density', document.getElementById('vp_underlay_density').value);
+            fd.append('max_stitch_length', document.getElementById('vp_max_stitch_length').value);
+            fd.append('min_stitch_length', document.getElementById('vp_min_stitch_length').value);
+            fd.append('satin_width_threshold', document.getElementById('vp_satin_width_threshold').value);
+            fd.append('underlay_angle', document.getElementById('vp_underlay_angle').value);
+            fd.append('max_stitches_per_block', document.getElementById('vp_max_stitches_per_block').value);
+            fd.append('target_width_mm', document.getElementById('vp_target_width_mm').value);
+            return fd;
+        }
+        
+        // ── request management ────────────────────────────────────────────────────────
+        let abortController = null;
+
+        cancelBtn.addEventListener('click', () => {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+                showError('Operation cancelled by user.');
+                unlockBtns();
+                hideProgress();
             }
         });
 
-        // Drag and drop handlers
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-
-            const file = e.dataTransfer.files[0];
-            if (file && file.type === 'image/svg+xml') {
-                selectedFile = file;
-                fileInput.files = e.dataTransfer.files;
-                fileName.textContent = file.name;
-                fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
-                fileInfo.style.display = 'block';
-                convertBtn.disabled = false;
-                hideMessages();
-            } else {
-                showError('Please select a valid SVG file');
+        async function fetchWithCancel(url, options) {
+            abortController = new AbortController();
+            try {
+                const response = await fetch(url, { ...options, signal: abortController.signal });
+                return response;
+            } finally {
+                abortController = null;
             }
-        });
+        }
 
-        // Convert button handler - now uses Shield integration
+        // ── button handlers ───────────────────────────────────────────────────────────
+        function lockBtns(label) {
+            [convertBtn, traceBtn, traceConvertBtn].forEach(b => b.disabled = true);
+            const active = fileMode === 'svg' ? convertBtn : (label.includes('Trace &') ? traceConvertBtn : traceBtn);
+            active.innerHTML = `<span class="loading"></span>${label}`;
+        }
+        function unlockBtns() {
+            if (fileMode === 'svg') { convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3'; }
+            else {
+                traceBtn.disabled = false; traceBtn.innerHTML = 'Trace to SVG';
+                traceConvertBtn.disabled = false; traceConvertBtn.innerHTML = 'Trace &amp; Convert';
+            }
+        }
+
+        // SVG → VP3
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
-
-            convertBtn.disabled = true;
-            convertBtn.innerHTML = '<span class="loading"></span>Preparing...';
-            progressContainer.style.display = 'block';
-            hideMessages();
-
+            lockBtns('Converting…');
+            showProgress('Converting SVG to VP3…');
+            hideResults();
             try {
-                await handleFileUpload(selectedFile);
-            } catch (error) {
-                showError('Upload failed: ' + error.message);
-            } finally {
-                convertBtn.disabled = false;
-                convertBtn.innerHTML = 'Convert to VP3';
-            }
+                const fd = vp3FormData();
+                const r = await fetchWithCancel('/api/convert', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Conversion failed');
+                showVp3Result(d, selectedFile.name.replace(/\.svg$/i, ''));
+            } catch (e) { showError('Conversion failed: ' + e.message); }
+            finally { unlockBtns(); hideProgress(); }
         });
 
-        // Local FastAPI upload handler
-        async function handleFileUpload(file) {
-            if (isConverting) return;
+        // Raster → SVG only
+        traceBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            lockBtns('Tracing…');
+            showProgress('Tracing with vtracer…');
+            hideResults();
             try {
-                isConverting = true;
-                showStatus('Converting SVG to VP3...');
+                const fd = vtracerFormData();
+                const r = await fetchWithCancel('/api/trace', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Tracing failed');
+                showSvgPreview(d.svg_base64);
+                attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg');
+                downloadArea.style.display = 'block';
+                showSuccess('Image traced to SVG. Adjust VP3 settings and click "Trace & Convert" to also export VP3.');
+            } catch (e) { showError('Tracing failed: ' + e.message); }
+            finally { unlockBtns(); hideProgress(); }
+        });
 
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('settings', JSON.stringify(currentSettings));
+        // Raster → SVG → VP3
+        traceConvertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            lockBtns('Trace & Convert…');
+            showProgress('Step 1/2 — tracing image…');
+            hideResults();
+            try {
+                const fd = vtracerFormData();
+                vp3FormData(fd); // merge VP3 params into same FormData
+                progressText.textContent = 'Step 2/2 — converting to VP3…';
+                const r = await fetchWithCancel('/api/trace-convert', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Trace-convert failed');
+                if (d.svg_base64) { showSvgPreview(d.svg_base64); attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg'); }
+                showVp3Result(d, selectedFile.name.replace(/\.[^.]+$/, ''));
+            } catch (e) { showError('Trace-convert failed: ' + e.message); }
+            finally { unlockBtns(); hideProgress(); }
+        });
 
-                const response = await fetch('/api/convert', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    let errMsg = `Conversion failed: ${response.status}`;
-                    try {
-                        const errData = await response.json();
-                        if (errData.detail) errMsg = errData.detail;
-                    } catch (e) { }
-                    throw new Error(errMsg);
-                }
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Create blob from base64
-                    const byteCharacters = atob(result.vp3_base64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: 'application/octet-stream' });
-
-                    // Create download URL
-                    const blobUrl = URL.createObjectURL(blob);
-
-                    downloadBtn.href = blobUrl;
-                    downloadBtn.download = file.name.replace('.svg', '.vp3');
-                    downloadArea.style.display = 'block';
-
-                    // Add listener to cleanup blob URL
-                    downloadBtn.addEventListener('click', function cleanup() {
-                        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-                        downloadBtn.removeEventListener('click', cleanup);
-                    });
-
-                    // Show embroidery preview if available
-                    if (result.preview_base64) {
-                        previewImage.src = 'data:image/svg+xml;base64,' + result.preview_base64;
-                        previewArea.style.display = 'block';
-                    } else {
-                        previewArea.style.display = 'none';
-                    }
-
-                    showSuccess(`Conversion complete! ${result.stitchCount} stitches, ${result.quality} quality`);
-                } else {
-                    previewArea.style.display = 'none';
-                    showError('Conversion failed: ' + (result.message || 'Unknown error'));
-                }
-
-            } catch (error) {
-                showError('Upload failed: ' + error.message);
-            } finally {
-                isConverting = false;
+        // ── result helpers ────────────────────────────────────────────────────────────
+        function showVp3Result(d, baseName) {
+            console.log('VP3 Result:', d);
+            const vp3Bytes = Uint8Array.from(atob(d.vp3_base64), c => c.charCodeAt(0));
+            const blob = new Blob([vp3Bytes], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            downloadVp3Btn.href = url;
+            downloadVp3Btn.download = baseName + '.vp3';
+            downloadVp3Btn.style.display = 'inline-block';
+            downloadVp3Btn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1000);
+            downloadArea.style.display = 'block';
+            
+            if (d.preview_base64) {
+                console.log('Applying embroidery preview...');
+                previewImage.src = 'data:image/svg+xml;base64,' + d.preview_base64;
+                previewArea.style.display = 'block';
+            } else {
+                console.warn('No embroidery preview (preview_base64) in server response');
+                previewArea.style.display = 'none';
             }
+            const dims = d.dimensions ? ` · ${d.dimensions.width?.toFixed(0)}×${d.dimensions.height?.toFixed(0)} mm` : '';
+            showSuccess(`Done! ${d.stitchCount?.toLocaleString()} stitches · ${d.quality} quality · ${d.complexity}${dims}`);
         }
 
-        // Helper function for status display
-        function showStatus(message) {
-            progressText.textContent = message;
-            progressFill.style.width = '50%'; // Show some progress during processing
+        function showSvgPreview(svg_b64, title = '🖼 Traced SVG') {
+            svgPreviewImage.src = 'data:image/svg+xml;base64,' + svg_b64;
+            svgPreviewArea.querySelector('.preview-box-title').textContent = title;
+            svgPreviewArea.style.display = 'block';
         }
 
-        // Sleep helper function
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+        function attachSvgDownload(svg_b64, filename) {
+            const blob = new Blob([atob(svg_b64)], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            downloadSvgBtn.href = url;
+            downloadSvgBtn.download = filename;
+            downloadSvgBtn.style.display = 'inline-block';
+            downloadSvgBtn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
 
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            successMessage.style.display = 'none';
-        }
+        // ── ui state helpers ──────────────────────────────────────────────────────────
+        function showProgress(msg) { progressText.textContent = msg; progressFill.style.width = '45%'; progressContainer.style.display = 'block'; }
+        function hideProgress() { progressContainer.style.display = 'none'; progressFill.style.width = '0%'; }
+        function hideResults() { svgPreviewArea.style.display = 'none'; previewArea.style.display = 'none'; downloadArea.style.display = 'none'; downloadSvgBtn.style.display = 'none'; downloadVp3Btn.style.display = 'none'; }
+        function showError(msg) { errorMessage.textContent = msg; errorMessage.style.display = 'block'; successMessage.style.display = 'none'; }
+        function showSuccess(msg) { successMessage.textContent = msg; successMessage.style.display = 'block'; errorMessage.style.display = 'none'; }
+        function hideMessages() { errorMessage.style.display = 'none'; successMessage.style.display = 'none'; }
 
-        function showSuccess(message) {
-            successMessage.textContent = message;
-            successMessage.style.display = 'block';
-            errorMessage.style.display = 'none';
-        }
-
-        function hideMessages() {
-            errorMessage.style.display = 'none';
-            successMessage.style.display = 'none';
-            previewArea.style.display = 'none';
-        }
-    </script>
-
-    <!-- Environment-aware meta tags -->
-    <script>
-        // Set environment-aware URLs for social media previews
-        (function () {
-            const currentUrl = window.location.href;
-            const baseUrl = currentUrl.split('?')[0]; // Remove query params
-
-            // Set canonical URL
-            document.getElementById('canonical-url').setAttribute('href', baseUrl);
-        })();
+        // ── canonical URL ─────────────────────────────────────────────────────────────
+        (function () { document.getElementById('canonical-url').setAttribute('href', window.location.href.split('?')[0]); })();
     </script>
 </body>
 
