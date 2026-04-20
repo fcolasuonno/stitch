@@ -812,8 +812,14 @@ def add_svg_to_pattern(pattern, svg_content: str):
 
 def convert_svg_to_vp3(svg_content: str) -> bytes:
     """Convert SVG content to VP3 embroidery format (primary public API)."""
+    vp3, _ = convert_svg_to_vp3_with_pattern(svg_content)
+    return vp3
+
+def convert_svg_to_vp3_with_pattern(svg_content: str):
+    """Convert SVG to VP3 and also return the pyembroidery pattern object.
+    Returns (vp3_bytes, pattern_or_None)."""
     if not PYEMBROIDERY_AVAILABLE:
-        return create_simple_vp3_file(svg_content)
+        return create_simple_vp3_file(svg_content), None
 
     try:
         pattern = pyembroidery.EmbPattern()
@@ -823,16 +829,16 @@ def convert_svg_to_vp3(svg_content: str) -> bytes:
         pyembroidery.write_vp3(pattern, buf)
         result = buf.getvalue()
         if result:
-            return result
+            return result, pattern
 
         # Fallback: DST
         buf2 = BytesIO()
         pyembroidery.write_dst(pattern, buf2)
-        return buf2.getvalue()
+        return buf2.getvalue(), pattern
 
     except Exception as e:
         print(f"convert_svg_to_vp3 error: {e}\n{traceback.format_exc()}")
-        return create_simple_vp3_file(svg_content)
+        return create_simple_vp3_file(svg_content), None
 
 # ── legacy helpers kept for backward compatibility ───────────────────────────
 def extract_svg_elements(svg_content: str):

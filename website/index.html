@@ -246,6 +246,38 @@
             font-size: 0.9rem;
         }
 
+        .preview-area {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(102, 126, 234, 0.06);
+            border-radius: 15px;
+            display: none;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 126, 234, 0.18);
+            text-align: center;
+        }
+
+        .preview-title {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .preview-area img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+            transition: transform 0.3s ease;
+        }
+
+        .preview-area img:hover {
+            transform: scale(1.03);
+        }
+
         .download-area {
             margin: 20px 0;
             padding: 20px;
@@ -410,6 +442,11 @@
             <div class="progress-text" id="progressText">Converting...</div>
         </div>
 
+        <div class="preview-area" id="previewArea">
+            <div class="preview-title">🔍 Embroidery Preview</div>
+            <img id="previewImage" alt="Embroidery stitch preview" />
+        </div>
+
         <div class="download-area" id="downloadArea">
             <div>✅ Conversion complete!</div>
             <a href="#" class="download-btn" id="downloadBtn" role="button"
@@ -432,6 +469,8 @@
         const progressText = document.getElementById('progressText');
         const downloadArea = document.getElementById('downloadArea');
         const downloadBtn = document.getElementById('downloadBtn');
+        const previewArea = document.getElementById('previewArea');
+        const previewImage = document.getElementById('previewImage');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
 
@@ -551,8 +590,17 @@
                         downloadBtn.removeEventListener('click', cleanup);
                     });
 
+                    // Show embroidery preview if available
+                    if (result.preview_base64) {
+                        previewImage.src = 'data:image/svg+xml;base64,' + result.preview_base64;
+                        previewArea.style.display = 'block';
+                    } else {
+                        previewArea.style.display = 'none';
+                    }
+
                     showSuccess(`Conversion complete! ${result.stitchCount} stitches, ${result.quality} quality`);
                 } else {
+                    previewArea.style.display = 'none';
                     showError('Conversion failed: ' + (result.message || 'Unknown error'));
                 }
 
@@ -587,6 +635,7 @@
         function hideMessages() {
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
+            previewArea.style.display = 'none';
         }
     </script>
 
