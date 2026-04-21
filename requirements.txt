@@ -5,3 +5,4 @@ svgpathtools>=1.7.1
 svg.path>=6.3
 pyembroidery>=1.5.1
 vtracer>=0.6.0
+Pillow>=10.0.0

@@ -578,6 +578,212 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+        /* ── bg-removal panel ── */
+        .param-panel.bg-removal {
+            background: rgba(239, 68, 68, 0.07);
+            border: 1px solid rgba(239, 68, 68, 0.22);
+        }
+
+        .param-panel.bg-removal .param-label span.val {
+            color: #f87171;
+        }
+
+        .param-panel.bg-removal input[type=range] {
+            accent-color: #ef4444;
+        }
+
+        /* ── size / hoop panel ── */
+        .param-panel.size-hoop {
+            background: rgba(34, 197, 94, 0.07);
+            border: 1px solid rgba(34, 197, 94, 0.22);
+        }
+
+        .param-panel.size-hoop .param-label span.val {
+            color: #4ade80;
+        }
+
+        .param-panel.size-hoop input[type=range],
+        .param-panel.size-hoop input[type=number] {
+            accent-color: #22c55e;
+        }
+
+        .hoop-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .hoop-btn {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 20px;
+            padding: 4px 11px;
+            font-size: 0.74rem;
+            cursor: pointer;
+            transition: all 0.18s;
+            white-space: nowrap;
+        }
+
+        .hoop-btn:hover,
+        .hoop-btn.active {
+            background: rgba(34, 197, 94, 0.25);
+            border-color: #22c55e;
+            color: #fff;
+        }
+
+        .size-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .size-inputs input[type=number] {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.84rem;
+            padding: 6px 10px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .size-inputs input[type=number]:focus {
+            border-color: #22c55e;
+        }
+
+        /* ── colour palette panel ── */
+        .param-panel.palette {
+            background: rgba(251, 191, 36, 0.06);
+            border: 1px solid rgba(251, 191, 36, 0.22);
+        }
+
+        .palette-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0 6px;
+            min-height: 36px;
+        }
+
+        .palette-hint {
+            font-size: 0.76rem;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 6px;
+        }
+
+        .swatch-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            cursor: pointer;
+        }
+
+        .swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.18s;
+            position: relative;
+        }
+
+        .swatch:hover {
+            transform: scale(1.12);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .swatch.excluded {
+            opacity: 0.25;
+            border-color: rgba(239, 68, 68, 0.7);
+        }
+
+        .swatch.excluded::after {
+            content: '✕';
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .swatch-hex {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.45);
+            font-family: monospace;
+            max-width: 36px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .palette-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .palette-row label {
+            font-size: 0.76rem;
+            color: rgba(255, 255, 255, 0.55);
+            white-space: nowrap;
+        }
+
+        .palette-row select {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.8rem;
+            padding: 5px 8px;
+            outline: none;
+        }
+
+        .palette-row select option {
+            background: #1a1a2e;
+        }
+
+        .palette-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .pal-btn {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.28);
+            color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 0.76rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pal-btn:hover {
+            background: rgba(251, 191, 36, 0.22);
+            color: #fff;
+        }
+
+        /* checkerboard for bg-removed preview */
+        .preview-box img {
+            background:
+                repeating-conic-gradient(#333 0% 25%, #1a1a2e 0% 50%) 0 0 / 16px 16px;
+        }
     </style>
 </head>
 
@@ -601,6 +807,95 @@
             <div class="file-name" id="fileName"></div>
             <div class="file-size" id="fileSize"></div>
             <div id="modeBadge"></div>
+        </div>
+
+
+        <!-- ★ Background removal panel -->
+        <div class="param-panel bg-removal" id="bgPanel" style="display:none;">
+            <div class="panel-title" id="bgToggle"><span class="chevron">▾</span> 🎨 Background removal</div>
+            <div class="panel-body" id="bgBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <label class="param-label" style="cursor:pointer;">
+                        <span>Remove background</span>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" id="removeBgCheck" style="width:auto;accent-color:#ef4444;">
+                            <span id="removeBgLabel" style="font-size:0.8rem;color:#f87171;">Off</span>
+                        </label>
+                    </label>
+                </div>
+                <div class="param-group" id="bgThresholdGroup" style="display:none;">
+                    <label class="param-label" for="bgThreshold">Tolerance <span class="val" id="vv_bgThreshold"
+                            style="color:#f87171;">30</span></label>
+                    <input type="range" id="bgThreshold" min="5" max="120" value="30" step="5">
+                </div>
+                <div class="param-group" id="bgHintGroup" style="display:none;">
+                    <p style="font-size:0.74rem;color:rgba(255,255,255,0.4);line-height:1.5;">
+                        Flood-fills from corners to remove the background colour.
+                        Increase tolerance for gradients / anti-aliased edges.
+                        For SVG files the background &lt;rect&gt; is removed automatically.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ★ Size / hoop panel -->
+        <div class="param-panel size-hoop" id="sizePanel" style="display:none;">
+            <div class="panel-title" id="sizeToggle"><span class="chevron">▾</span> 📐 Size &amp; hoop</div>
+            <div class="panel-body" id="sizeBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <label class="param-label">Hoop presets</label>
+                    <div class="hoop-presets" id="hoopPresets">
+                        <button class="hoop-btn" data-w="40" data-h="40">40×40 mm (Mini)</button>
+                        <button class="hoop-btn" data-w="60" data-h="40">60×40 mm</button>
+                        <button class="hoop-btn" data-w="100" data-h="100">100×100 mm (4×4″)</button>
+                        <button class="hoop-btn" data-w="130" data-h="180">130×180 mm (5×7″)</button>
+                        <button class="hoop-btn" data-w="150" data-h="200">150×200 mm (6×8″)</button>
+                        <button class="hoop-btn" data-w="200" data-h="200">200×200 mm (8×8″)</button>
+                        <button class="hoop-btn" data-w="240" data-h="200">240×200 mm (MEGA)</button>
+                        <button class="hoop-btn" data-w="180" data-h="300">180×300 mm (7×12″)</button>
+                        <button class="hoop-btn" data-w="260" data-h="200">260×200 mm (Jumbo)</button>
+                    </div>
+                </div>
+                <div class="param-group full-width">
+                    <label class="param-label">Custom size (mm)</label>
+                    <div class="size-inputs">
+                        <div>
+                            <label class="param-label" for="sizeWidth">Width</label>
+                            <input type="number" id="sizeWidth" min="10" max="500" value="100" step="1">
+                        </div>
+                        <div>
+                            <label class="param-label" for="sizeHeight">Height <span
+                                    style="color:rgba(255,255,255,0.3);font-size:0.7rem;">(aspect locked)</span></label>
+                            <input type="number" id="sizeHeight" min="10" max="500" value="100" step="1">
+                        </div>
+                    </div>
+                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:6px;">
+                        The design will be scaled to fit within these bounds while preserving aspect ratio.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ★ Colour palette panel -->
+        <div class="param-panel palette" id="palettePanel" style="display:none;">
+            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette</div>
+            <div class="panel-body" id="paletteBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <p class="palette-hint" id="paletteHint">Upload a file to detect colours.</p>
+                    <div class="palette-swatches" id="paletteSwatches"></div>
+                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:2px;">
+                        Click a swatch to exclude that colour from the embroidery.
+                        Click on the image preview to pick a colour.
+                    </p>
+                </div>
+                <div class="param-group full-width">
+                    <div class="palette-actions">
+                        <button class="pal-btn" id="palEnableAll">✓ Enable all</button>
+                        <button class="pal-btn" id="palDisableAll">✕ Exclude all</button>
+                        <button class="pal-btn" id="palExtractBtn">⟳ Re-detect from preview</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- ① vtracer params (raster only) -->
@@ -725,10 +1020,13 @@
                             id="vv_underlay_angle">90</span>°</label>
                     <input type="range" id="vp_underlay_angle" min="0" max="180" value="90" step="1">
                 </div>
-                <div class="param-group">
-                    <label class="param-label" for="vp_target_width_mm">Target width <span class="val blue"
-                            id="vv_target_width_mm">100</span> mm</label>
-                    <input type="range" id="vp_target_width_mm" min="20" max="300" value="100" step="5">
+                <div class="param-group full-width">
+                    <label class="param-label" style="font-size:0.76rem;color:rgba(255,255,255,0.35);">
+                        ↑ Output size is controlled in the <strong style="color:#4ade80;">Size &amp; hoop</strong> panel
+                        above.
+                    </label>
+                    <!-- hidden input keeps the FormData API intact -->
+                    <input type="hidden" id="vp_target_width_mm" value="100">
                 </div>
                 <div class="param-group">
                     <label class="param-label" for="vp_max_stitches_per_block">Max stitches/block <span class="val blue"
@@ -814,6 +1112,28 @@
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
 
+        // ── new feature refs ─────────────────────────────────────────────────────────
+        const bgPanel = document.getElementById('bgPanel');
+        const bgToggle = document.getElementById('bgToggle');
+        const bgBody = document.getElementById('bgBody');
+        const removeBgCheck = document.getElementById('removeBgCheck');
+        const removeBgLabel = document.getElementById('removeBgLabel');
+        const bgThreshold = document.getElementById('bgThreshold');
+        const bgThresholdGroup = document.getElementById('bgThresholdGroup');
+        const bgHintGroup = document.getElementById('bgHintGroup');
+        const sizePanel = document.getElementById('sizePanel');
+        const sizeToggle = document.getElementById('sizeToggle');
+        const sizeBody = document.getElementById('sizeBody');
+        const sizeWidth = document.getElementById('sizeWidth');
+        const sizeHeight = document.getElementById('sizeHeight');
+        const hoopPresets = document.getElementById('hoopPresets');
+        const palettePanel = document.getElementById('palettePanel');
+        const paletteToggle = document.getElementById('paletteToggle');
+        const paletteBody = document.getElementById('paletteBody');
+        const paletteSwatches = document.getElementById('paletteSwatches');
+        const paletteHint = document.getElementById('paletteHint');
+
+
         // ── slider live value wiring ──────────────────────────────────────────────────
         const VTRACER_SLIDERS = [
             ['vt_filter_speckle', 'vv_filter_speckle', v => v],
@@ -841,8 +1161,8 @@
         [...VTRACER_SLIDERS, ...VP3_SLIDERS].forEach(([sid, vid, fmt]) => {
             const sl = document.getElementById(sid);
             const vl = document.getElementById(vid);
-            if (sl && vl) sl.addEventListener('input', () => { 
-                vl.textContent = fmt(sl.value); 
+            if (sl && vl) sl.addEventListener('input', () => {
+                vl.textContent = fmt(sl.value);
                 saveSettings();
             });
         });
@@ -941,6 +1261,11 @@
             fileInfo.style.display = 'block';
             fileMode = mode;
             hideMessages(); hideResults();
+            // Reset palette state for new file
+            Object.keys(paletteState).forEach(k => delete paletteState[k]);
+            paletteSwatches.innerHTML = '';
+            paletteHint.textContent = 'Upload a file to detect colours.';
+
 
             if (mode === 'svg') {
                 modeBadge.innerHTML = '<span class="mode-badge svg">SVG → VP3</span>';
@@ -949,10 +1274,27 @@
                 traceConvertBtn.style.display = 'none';
                 vtracerPanel.style.display = 'none';
                 vp3Panel.style.display = 'block';
-                
+                bgPanel.style.display = 'block';
+                sizePanel.style.display = 'block';
+                palettePanel.style.display = 'block';
+
                 // Show immediate preview of the uploaded SVG
                 const reader = new FileReader();
-                reader.onload = e => showSvgPreview(btoa(e.target.result), 'Uploaded SVG');
+                reader.onload = e => {
+                    const svgText = e.target.result;
+                    showSvgPreview(btoa(svgText), 'Uploaded SVG');
+                    attachPreviewColorPicker(svgPreviewImage);
+                    // Extract natural dimensions for size panel
+                    const dimMatch = svgText.match(/viewBox="[\d.\s,]*/);
+                    if (dimMatch) {
+                        const parts = dimMatch[0].replace('viewBox="', '').trim().split(/[\s,]+/);
+                        if (parts.length >= 4) setNaturalAspect(parseFloat(parts[2]), parseFloat(parts[3]));
+                    }
+                    // Extract colours client-side
+                    const cols = extractColorsFromSVGText(svgText);
+                    Object.keys(paletteState).forEach(k => delete paletteState[k]);
+                    buildSwatches(cols);
+                };
                 reader.readAsText(file);
             } else {
                 modeBadge.innerHTML = '<span class="mode-badge raster">Image → SVG → VP3 via vtracer</span>';
@@ -961,9 +1303,12 @@
                 traceConvertBtn.style.display = 'inline-block'; traceConvertBtn.disabled = false;
                 vtracerPanel.style.display = 'block';
                 vp3Panel.style.display = 'block';
-                // ensure both panels open
-                [vtracerToggle, vp3Toggle].forEach(t => { t.classList.remove('collapsed'); });
-                [vtracerBody, vp3Body].forEach(b => { b.style.display = 'grid'; });
+                bgPanel.style.display = 'block';
+                sizePanel.style.display = 'block';
+                palettePanel.style.display = 'block';
+                // ensure all panels open
+                [vtracerToggle, vp3Toggle, bgToggle, sizeToggle, paletteToggle].forEach(t => { t.classList.remove('collapsed'); });
+                [vtracerBody, vp3Body, bgBody, sizeBody, paletteBody].forEach(b => { b.style.display = 'grid'; });
 
                 // Show raster preview
                 const reader = new FileReader();
@@ -971,6 +1316,13 @@
                     svgPreviewImage.src = e.target.result;
                     svgPreviewArea.querySelector('.preview-box-title').textContent = '🖼 Source Image';
                     svgPreviewArea.style.display = 'block';
+                    attachPreviewColorPicker(svgPreviewImage);
+                    // Detect natural size from Image for hoop/size panel
+                    const img = new Image();
+                    img.onload = () => setNaturalAspect(img.naturalWidth, img.naturalHeight);
+                    img.src = e.target.result;
+                    paletteHint.textContent = 'Colours will appear after tracing.';
+                    paletteSwatches.innerHTML = '';
                 };
                 reader.readAsDataURL(file);
             }
@@ -985,6 +1337,226 @@
             e.preventDefault(); uploadArea.classList.remove('dragover');
             if (e.dataTransfer.files[0]) handleFileSelected(e.dataTransfer.files[0]);
         });
+
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ★ BACKGROUND REMOVAL
+        // ═══════════════════════════════════════════════════════════════════
+        bgThreshold.addEventListener('input', () => {
+            document.getElementById('vv_bgThreshold').textContent = bgThreshold.value;
+        });
+        removeBgCheck.addEventListener('change', () => {
+            const on = removeBgCheck.checked;
+            removeBgLabel.textContent = on ? 'On' : 'Off';
+            bgThresholdGroup.style.display = on ? 'flex' : 'none';
+            bgHintGroup.style.display = on ? 'flex' : 'none';
+        });
+        makeToggle(bgToggle, bgBody);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ★ SIZE / HOOP
+        // ═══════════════════════════════════════════════════════════════════
+        makeToggle(sizeToggle, sizeBody);
+
+        // Track original image aspect ratio to lock proportions
+        let _origAspect = 1;
+        let _lockAspect = false;
+
+        function setHoopActive(btn) {
+            document.querySelectorAll('.hoop-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
+
+        hoopPresets.addEventListener('click', e => {
+            const btn = e.target.closest('.hoop-btn');
+            if (!btn) return;
+            const w = parseInt(btn.dataset.w);
+            const h = parseInt(btn.dataset.h);
+            sizeWidth.value = w;
+            sizeHeight.value = h;
+            _lockAspect = false;
+            setHoopActive(btn);
+            // sync hidden vp3 input
+            document.getElementById('vp_target_width_mm').value = Math.max(w, h);
+        });
+
+        function _clearHoopActive() {
+            document.querySelectorAll('.hoop-btn').forEach(b => b.classList.remove('active'));
+        }
+
+        sizeWidth.addEventListener('input', () => {
+            _clearHoopActive();
+            if (_lockAspect && _origAspect) {
+                sizeHeight.value = Math.round(parseFloat(sizeWidth.value) / _origAspect);
+            }
+            document.getElementById('vp_target_width_mm').value = Math.max(
+                parseFloat(sizeWidth.value) || 100,
+                parseFloat(sizeHeight.value) || 100
+            );
+        });
+        sizeHeight.addEventListener('input', () => {
+            _clearHoopActive();
+            if (_lockAspect && _origAspect) {
+                sizeWidth.value = Math.round(parseFloat(sizeHeight.value) * _origAspect);
+            }
+            document.getElementById('vp_target_width_mm').value = Math.max(
+                parseFloat(sizeWidth.value) || 100,
+                parseFloat(sizeHeight.value) || 100
+            );
+        });
+
+        function setNaturalAspect(w, h) {
+            if (w && h) {
+                _origAspect = w / h;
+                _lockAspect = true;
+                // Fit within default 100mm keeping aspect
+                const scale = 100 / Math.max(w, h);
+                sizeWidth.value = Math.round(w * scale);
+                sizeHeight.value = Math.round(h * scale);
+                document.getElementById('vp_target_width_mm').value = 100;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ★ COLOUR PALETTE
+        // ═══════════════════════════════════════════════════════════════════
+        makeToggle(paletteToggle, paletteBody);
+
+        // Map: hex → {excluded: bool}
+        const paletteState = {};
+
+        function buildSwatches(colors) {
+            paletteSwatches.innerHTML = '';
+            if (!colors || !colors.length) {
+                paletteHint.textContent = 'No colours detected.';
+                return;
+            }
+            paletteHint.textContent = colors.length + ' colour' + (colors.length !== 1 ? 's' : '') + ' detected — click to exclude:';
+            colors.forEach(hex => {
+                if (!paletteState[hex]) paletteState[hex] = { excluded: false };
+                const wrap = document.createElement('div');
+                wrap.className = 'swatch-wrap';
+                wrap.title = hex + ' — click to toggle';
+
+                const sw = document.createElement('div');
+                sw.className = 'swatch' + (paletteState[hex].excluded ? ' excluded' : '');
+                sw.style.background = hex;
+                sw.dataset.hex = hex;
+
+                const lbl = document.createElement('span');
+                lbl.className = 'swatch-hex';
+                lbl.textContent = hex;
+
+                wrap.appendChild(sw);
+                wrap.appendChild(lbl);
+                paletteSwatches.appendChild(wrap);
+
+                wrap.addEventListener('click', () => {
+                    paletteState[hex].excluded = !paletteState[hex].excluded;
+                    sw.classList.toggle('excluded', paletteState[hex].excluded);
+                });
+            });
+        }
+
+        function getColorMap() {
+            const map = {};
+            let hasExclusions = false;
+            Object.entries(paletteState).forEach(([hex, s]) => {
+                if (s.excluded) { map[hex] = null; hasExclusions = true; }
+            });
+            return hasExclusions ? JSON.stringify(map) : null;
+        }
+
+        // Allow clicking on the SVG preview image to pick & exclude colours
+        function attachPreviewColorPicker(imgEl) {
+            imgEl.addEventListener('click', e => {
+                const rect = imgEl.getBoundingClientRect();
+                const px = e.clientX - rect.left;
+                const py = e.clientY - rect.top;
+                // Draw the SVG to a canvas to sample
+                const canvas = document.createElement('canvas');
+                canvas.width = imgEl.naturalWidth || imgEl.width;
+                canvas.height = imgEl.naturalHeight || imgEl.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const [r, g, b, a] = ctx.getImageData(Math.round(px * scaleX), Math.round(py * scaleY), 1, 1).data;
+                if (a < 10) return; // transparent
+                const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+                // Find nearest swatch
+                let best = null, bestDist = Infinity;
+                Object.keys(paletteState).forEach(h => {
+                    const hr = parseInt(h.slice(1, 3), 16), hg = parseInt(h.slice(3, 5), 16), hb = parseInt(h.slice(5, 7), 16);
+                    const d = (r - hr) ** 2 + (g - hg) ** 2 + (b - hb) ** 2;
+                    if (d < bestDist) { bestDist = d; best = h; }
+                });
+                if (best && bestDist < 5000) {
+                    paletteState[best].excluded = !paletteState[best].excluded;
+                    const sw = paletteSwatches.querySelector('[data-hex="' + best + '"]');
+                    if (sw) sw.classList.toggle('excluded', paletteState[best].excluded);
+                }
+            });
+        }
+
+        document.getElementById('palEnableAll').addEventListener('click', () => {
+            Object.keys(paletteState).forEach(h => { paletteState[h].excluded = false; });
+            paletteSwatches.querySelectorAll('.swatch').forEach(s => s.classList.remove('excluded'));
+        });
+        document.getElementById('palDisableAll').addEventListener('click', () => {
+            Object.keys(paletteState).forEach(h => { paletteState[h].excluded = true; });
+            paletteSwatches.querySelectorAll('.swatch').forEach(s => s.classList.add('excluded'));
+        });
+        document.getElementById('palExtractBtn').addEventListener('click', async () => {
+            if (!svgPreviewImage.src || svgPreviewImage.src === window.location.href) return;
+            // Re-extract from displayed SVG preview
+            const b64 = svgPreviewImage.src.replace(/^data:image\/svg\+xml;base64,/, '');
+            if (!b64) return;
+            try {
+                const fd = new FormData();
+                fd.append('svg_base64', b64);
+                const r = await fetch('/api/extract-colors', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.colors) {
+                    Object.keys(paletteState).forEach(k => delete paletteState[k]);
+                    buildSwatches(d.colors);
+                }
+            } catch (e) { console.error('Color extraction failed', e); }
+        });
+
+        // Extract colours from SVG text client-side (fast, no server round-trip)
+        function extractColorsFromSVGText(svgText) {
+            const colors = new Set();
+            const patterns = [
+                /fill\s*=\s*"([^"]+)"/gi,
+                /fill\s*=\s*'([^']+)'/gi,
+                /stroke\s*=\s*"([^"]+)"/gi,
+                /fill\s*:\s*([^;}"'\s]+)/gi,
+            ];
+            patterns.forEach(re => {
+                let m;
+                while ((m = re.exec(svgText)) !== null) {
+                    const v = m[1].trim();
+                    if (v && !['none', 'transparent', 'inherit', 'currentcolor'].includes(v.toLowerCase())) {
+                        const hex = normColor(v);
+                        if (hex) colors.add(hex);
+                    }
+                }
+            });
+            return [...colors].sort();
+        }
+
+        function normColor(val) {
+            val = val.trim();
+            if (val.startsWith('#')) {
+                const h = val.slice(1);
+                if (h.length === 3) return '#' + h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+                if (h.length === 6) return val.toLowerCase();
+            }
+            const m = val.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+            if (m) return '#' + [m[1], m[2], m[3]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');
+            return null;
+        }
 
         // ── FormData builders ─────────────────────────────────────────────────────────
         function vtracerFormData() {
@@ -1001,6 +1573,9 @@
             fd.append('max_iterations', document.getElementById('vt_max_iterations').value);
             fd.append('splice_threshold', document.getElementById('vt_splice_threshold').value);
             fd.append('path_precision', document.getElementById('vt_path_precision').value);
+            // background removal
+            fd.append('remove_background', removeBgCheck.checked ? 'true' : 'false');
+            fd.append('bg_threshold', bgThreshold.value);
             return fd;
         }
 
@@ -1016,10 +1591,16 @@
             fd.append('satin_width_threshold', document.getElementById('vp_satin_width_threshold').value);
             fd.append('underlay_angle', document.getElementById('vp_underlay_angle').value);
             fd.append('max_stitches_per_block', document.getElementById('vp_max_stitches_per_block').value);
-            fd.append('target_width_mm', document.getElementById('vp_target_width_mm').value);
+            fd.append('target_width_mm', sizeWidth.value);
+            fd.append('target_height_mm', sizeHeight.value);
+            // colour remapping
+            const cmap = getColorMap();
+            if (cmap) fd.append('color_map', cmap);
+            // background removal for SVG
+            fd.append('remove_background', removeBgCheck.checked ? 'true' : 'false');
             return fd;
         }
-        
+
         // ── request management ────────────────────────────────────────────────────────
         let abortController = null;
 
@@ -1085,6 +1666,7 @@
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Tracing failed');
                 showSvgPreview(d.svg_base64);
+                applyResponseColors(d);
                 attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg');
                 downloadArea.style.display = 'block';
                 showSuccess('Image traced to SVG. Adjust VP3 settings and click "Trace & Convert" to also export VP3.');
@@ -1106,6 +1688,7 @@
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Trace-convert failed');
                 if (d.svg_base64) { showSvgPreview(d.svg_base64); attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg'); }
+                applyResponseColors(d);
                 showVp3Result(d, selectedFile.name.replace(/\.[^.]+$/, ''));
             } catch (e) { showError('Trace-convert failed: ' + e.message); }
             finally { unlockBtns(); hideProgress(); }
@@ -1122,7 +1705,7 @@
             downloadVp3Btn.style.display = 'inline-block';
             downloadVp3Btn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1000);
             downloadArea.style.display = 'block';
-            
+
             if (d.preview_base64) {
                 console.log('Applying embroidery preview...');
                 previewImage.src = 'data:image/svg+xml;base64,' + d.preview_base64;
@@ -1139,6 +1722,14 @@
             svgPreviewImage.src = 'data:image/svg+xml;base64,' + svg_b64;
             svgPreviewArea.querySelector('.preview-box-title').textContent = title;
             svgPreviewArea.style.display = 'block';
+        }
+        function applyResponseColors(d) {
+            if (d.colors && d.colors.length) {
+                // Only reset palette state for newly detected colours; keep user exclusions for known ones
+                d.colors.forEach(h => { if (!paletteState[h]) paletteState[h] = { excluded: false }; });
+                buildSwatches(d.colors);
+                attachPreviewColorPicker(svgPreviewImage);
+            }
         }
 
         function attachSvgDownload(svg_b64, filename) {

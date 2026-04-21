@@ -6,7 +6,11 @@ from typing import Optional
 import base64
 import traceback
 import os
+import io
+import json
+import re
 import threading
+import xml.etree.ElementTree as ET
 import core.converter as _converter_module
 from core.converter import convert_svg_to_vp3_with_pattern, count_stitches_in_vp3, assess_embroidery_quality
 
@@ -21,6 +25,12 @@ try:
     VTRACER_AVAILABLE = True
 except ImportError:
     VTRACER_AVAILABLE = False
+
+try:
+    from PIL import Image as PILImage
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
 
 app = FastAPI()
 
@@ -50,7 +60,181 @@ def _guess_format(filename: str, content_type: str) -> Optional[str]:
     return RASTER_TYPES.get(content_type)
 
 
-# ── thread-safe settings patch ───────────────────────────────────────────────
+def _color_distance(c1, c2):
+    return sum((a - b) ** 2 for a, b in zip(c1[:3], c2[:3])) ** 0.5
+
+
+def _remove_raster_background(img_bytes: bytes, threshold: int = 30) -> bytes:
+    if not PILLOW_AVAILABLE:
+        raise RuntimeError("Pillow is not installed. Run: pip install Pillow")
+    img = PILImage.open(io.BytesIO(img_bytes)).convert("RGBA")
+    w, h = img.size
+    pixels = img.load()
+    corners = [
+        pixels[0, 0][:3], pixels[w - 1, 0][:3],
+        pixels[0, h - 1][:3], pixels[w - 1, h - 1][:3],
+    ]
+    bg_color = max(set(corners), key=corners.count)
+    visited = [[False] * h for _ in range(w)]
+    queue = []
+    for sx, sy in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
+        if _color_distance(pixels[sx, sy][:3], bg_color) <= threshold:
+            queue.append((sx, sy))
+            visited[sx][sy] = True
+    while queue:
+        x, y = queue.pop()
+        pixels[x, y] = (0, 0, 0, 0)
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < w and 0 <= ny < h and not visited[nx][ny]:
+                if _color_distance(pixels[nx, ny][:3], bg_color) <= threshold:
+                    visited[nx][ny] = True
+                    queue.append((nx, ny))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+def _parse_svg_color(val: str) -> Optional[str]:
+    if not val or val in ("none", "transparent", "inherit", "currentColor"):
+        return None
+    val = val.strip()
+    if val.startswith("#"):
+        h = val[1:]
+        if len(h) == 3:
+            h = h[0]*2 + h[1]*2 + h[2]*2
+        if len(h) == 6:
+            return "#" + h.lower()
+    m = re.match(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", val, re.I)
+    if m:
+        return "#{:02x}{:02x}{:02x}".format(int(m[1]), int(m[2]), int(m[3]))
+    return None
+
+
+def _remove_svg_background(svg_str: str) -> str:
+    try:
+        ET.register_namespace("", "http://www.w3.org/2000/svg")
+        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+        root = ET.fromstring(svg_str)
+        vb = root.get("viewBox", "")
+        vb_parts = re.split(r"[\s,]+", vb.strip())
+        vb_w = float(vb_parts[2]) if len(vb_parts) >= 4 else None
+        vb_h = float(vb_parts[3]) if len(vb_parts) >= 4 else None
+        svg_w = float(root.get("width", vb_w or 0) or vb_w or 0)
+        svg_h = float(root.get("height", vb_h or 0) or vb_h or 0)
+
+        def is_background_rect(el):
+            tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+            if tag != "rect":
+                return False
+            try:
+                rw_str = el.get("width", "0")
+                rh_str = el.get("height", "0")
+                rw = svg_w if "%" in rw_str else float(rw_str)
+                rh = svg_h if "%" in rh_str else float(rh_str)
+            except ValueError:
+                return False
+            rx = float(el.get("x", "0"))
+            ry = float(el.get("y", "0"))
+            if svg_w and svg_h:
+                if rw < svg_w * 0.9 or rh < svg_h * 0.9:
+                    return False
+            if rx != 0 or ry != 0:
+                return False
+            return True
+
+        def strip_bg(parent):
+            to_remove = []
+            for child in list(parent):
+                tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                if is_background_rect(child):
+                    to_remove.append(child)
+                elif tag not in ("defs", "style"):
+                    strip_bg(child)
+            for el in to_remove:
+                parent.remove(el)
+
+        strip_bg(root)
+        style = root.get("style", "")
+        style = re.sub(r"background(-color)?\s*:[^;]+;?", "", style, flags=re.I).strip()
+        if style:
+            root.set("style", style)
+        elif "style" in root.attrib:
+            del root.attrib["style"]
+        return ET.tostring(root, encoding="unicode", xml_declaration=False)
+    except Exception as e:
+        print(f"SVG background removal failed: {e}")
+        return svg_str
+
+
+def _remap_svg_colors(svg_str: str, color_map: dict) -> str:
+    if not color_map:
+        return svg_str
+    norm_map = {}
+    for k, v in color_map.items():
+        nk = _parse_svg_color(k)
+        if nk:
+            norm_map[nk] = _parse_svg_color(v) if v else None
+
+    try:
+        ET.register_namespace("", "http://www.w3.org/2000/svg")
+        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+        root = ET.fromstring(svg_str)
+
+        def remap_el(parent):
+            to_remove = []
+            for el in list(parent):
+                fill = _parse_svg_color(el.get("fill", ""))
+                stroke = _parse_svg_color(el.get("stroke", ""))
+                style_fill = None
+                style_str = el.get("style", "")
+                if style_str:
+                    m = re.search(r"fill\s*:\s*([^;]+)", style_str)
+                    if m:
+                        style_fill = _parse_svg_color(m.group(1).strip())
+                dominant = fill or style_fill or stroke
+                if dominant and dominant in norm_map:
+                    new_color = norm_map[dominant]
+                    if new_color is None:
+                        to_remove.append(el)
+                        continue
+                    else:
+                        if fill:
+                            el.set("fill", new_color)
+                        if stroke:
+                            el.set("stroke", new_color)
+                        if style_fill and style_str:
+                            new_style = re.sub(
+                                r"(fill\s*:)\s*[^;]+", r"\g<1>" + new_color, style_str
+                            )
+                            el.set("style", new_style)
+                remap_el(el)
+            for el in to_remove:
+                parent.remove(el)
+
+        remap_el(root)
+        return ET.tostring(root, encoding="unicode", xml_declaration=False)
+    except Exception as e:
+        print(f"SVG colour remap failed: {e}")
+        return svg_str
+
+
+def _extract_svg_colors(svg_str: str) -> list:
+    colors = set()
+    for pattern in [
+        r'fill\s*=\s*"([^"]+)"',
+        r"fill\s*=\s*'([^']+)'",
+        r'stroke\s*=\s*"([^"]+)"',
+        r"stroke\s*=\s*'([^']+)'",
+        r'fill\s*:\s*([^;}"\']+)',
+    ]:
+        for m in re.finditer(pattern, svg_str, re.I):
+            c = _parse_svg_color(m.group(1).strip())
+            if c:
+                colors.add(c)
+    return sorted(colors)
+
+
 def _convert_with_settings(svg_content: str, vp3_params: dict):
     """
     Temporarily override PROFESSIONAL_SETTINGS for this conversion, then restore.
@@ -165,52 +349,43 @@ def _run_vtracer(img_bytes: bytes, img_format: str, params: dict) -> str:
     return vtracer.convert_raw_image_to_svg(img_bytes, img_format=img_format, **clean)
 
 
-# ── shared Form params for VP3 settings ─────────────────────────────────────
-# (declared as a helper so we don't repeat 11 lines in every endpoint)
-def _vp3_params(
-    fill_density:          Optional[float] = Form(None),
-    fill_stitch_length:    Optional[float] = Form(None),
-    satin_stitch_length:   Optional[float] = Form(None),
-    running_stitch_length: Optional[float] = Form(None),
-    underlay_density:      Optional[float] = Form(None),
-    max_stitch_length:     Optional[float] = Form(None),
-    min_stitch_length:     Optional[float] = Form(None),
-    satin_width_threshold: Optional[float] = Form(None),
-    underlay_angle:        Optional[float] = Form(None),
-    max_stitches_per_block:Optional[int]   = Form(None),
-    target_width_mm:       Optional[float] = Form(None),
+@app.post("/api/extract-colors")
+async def extract_colors(
+    file: UploadFile = File(None),
+    svg_base64: Optional[str] = Form(None),
 ):
-    return dict(
-        fill_density=fill_density,
-        fill_stitch_length=fill_stitch_length,
-        satin_stitch_length=satin_stitch_length,
-        running_stitch_length=running_stitch_length,
-        underlay_density=underlay_density,
-        max_stitch_length=max_stitch_length,
-        min_stitch_length=min_stitch_length,
-        satin_width_threshold=satin_width_threshold,
-        underlay_angle=underlay_angle,
-        max_stitches_per_block=max_stitches_per_block,
-        target_width_mm=target_width_mm,
-    )
+    try:
+        if svg_base64:
+            svg_str = base64.b64decode(svg_base64).decode("utf-8")
+        elif file:
+            content = await file.read()
+            svg_str = content.decode("utf-8")
+        else:
+            raise HTTPException(status_code=400, detail="Provide file or svg_base64")
+        colors = _extract_svg_colors(svg_str)
+        return JSONResponse({"success": True, "colors": colors})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── /api/convert  (SVG → VP3) ────────────────────────────────────────────────
 @app.post("/api/convert")
 async def convert_svg(
     file: UploadFile = File(...),
-    # VP3 stitch parameters
-    fill_density:          Optional[float] = Form(None),
-    fill_stitch_length:    Optional[float] = Form(None),
-    satin_stitch_length:   Optional[float] = Form(None),
-    running_stitch_length: Optional[float] = Form(None),
-    underlay_density:      Optional[float] = Form(None),
-    max_stitch_length:     Optional[float] = Form(None),
-    min_stitch_length:     Optional[float] = Form(None),
-    satin_width_threshold: Optional[float] = Form(None),
-    underlay_angle:        Optional[float] = Form(None),
-    max_stitches_per_block:Optional[int]   = Form(None),
-    target_width_mm:       Optional[float] = Form(None),
+    remove_background:      Optional[str]   = Form(None),
+    fill_density:           Optional[float] = Form(None),
+    fill_stitch_length:     Optional[float] = Form(None),
+    satin_stitch_length:    Optional[float] = Form(None),
+    running_stitch_length:  Optional[float] = Form(None),
+    underlay_density:       Optional[float] = Form(None),
+    max_stitch_length:      Optional[float] = Form(None),
+    min_stitch_length:      Optional[float] = Form(None),
+    satin_width_threshold:  Optional[float] = Form(None),
+    underlay_angle:         Optional[float] = Form(None),
+    max_stitches_per_block: Optional[int]   = Form(None),
+    target_width_mm:        Optional[float] = Form(None),
+    target_height_mm:       Optional[float] = Form(None),
+    color_map:              Optional[str]   = Form(None),
 ):
     if not file.filename.endswith('.svg') and file.content_type != 'image/svg+xml':
         if not file.filename.endswith('.svg'):
@@ -222,13 +397,27 @@ async def convert_svg(
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="Invalid SVG file encoding")
 
+        if remove_background and remove_background.lower() == "true":
+            svg_content = _remove_svg_background(svg_content)
+
+        if color_map:
+            try:
+                cmap = json.loads(color_map)
+                svg_content = _remap_svg_colors(svg_content, cmap)
+            except Exception as e:
+                print(f"color_map parse error: {e}")
+
+        effective_width = target_width_mm
+        if target_height_mm and not target_width_mm:
+            effective_width = target_height_mm
+
         vp3_params = dict(
             fill_density=fill_density, fill_stitch_length=fill_stitch_length,
             satin_stitch_length=satin_stitch_length, running_stitch_length=running_stitch_length,
             underlay_density=underlay_density, max_stitch_length=max_stitch_length,
             min_stitch_length=min_stitch_length, satin_width_threshold=satin_width_threshold,
             underlay_angle=underlay_angle, max_stitches_per_block=max_stitches_per_block,
-            target_width_mm=target_width_mm,
+            target_width_mm=effective_width,
         )
 
         vp3_content, pattern = _convert_with_settings(svg_content, vp3_params)
@@ -259,18 +448,19 @@ async def convert_svg(
 @app.post("/api/trace")
 async def trace_image(
     file: UploadFile = File(...),
-    # vtracer parameters
-    colormode:        Optional[str]   = Form(None),
-    hierarchical:     Optional[str]   = Form(None),
-    mode:             Optional[str]   = Form(None),
-    filter_speckle:   Optional[int]   = Form(None),
-    color_precision:  Optional[int]   = Form(None),
-    layer_difference: Optional[int]   = Form(None),
-    corner_threshold: Optional[int]   = Form(None),
-    length_threshold: Optional[float] = Form(None),
-    max_iterations:   Optional[int]   = Form(None),
-    splice_threshold: Optional[int]   = Form(None),
-    path_precision:   Optional[int]   = Form(None),
+    remove_background:  Optional[str] = Form(None),
+    bg_threshold:       Optional[int] = Form(30),
+    colormode:          Optional[str]   = Form(None),
+    hierarchical:       Optional[str]   = Form(None),
+    mode:               Optional[str]   = Form(None),
+    filter_speckle:     Optional[int]   = Form(None),
+    color_precision:    Optional[int]   = Form(None),
+    layer_difference:   Optional[int]   = Form(None),
+    corner_threshold:   Optional[int]   = Form(None),
+    length_threshold:   Optional[float] = Form(None),
+    max_iterations:     Optional[int]   = Form(None),
+    splice_threshold:   Optional[int]   = Form(None),
+    path_precision:     Optional[int]   = Form(None),
 ):
     if not VTRACER_AVAILABLE:
         raise HTTPException(status_code=503, detail="vtracer is not installed on the server")
@@ -279,6 +469,9 @@ async def trace_image(
         raise HTTPException(status_code=400, detail="Unsupported image format.")
     try:
         img_bytes = await file.read()
+        if remove_background and remove_background.lower() == "true":
+            img_bytes = _remove_raster_background(img_bytes, threshold=bg_threshold or 30)
+            img_format = "png"
         vt_params = dict(
             colormode=colormode, hierarchical=hierarchical, mode=mode,
             filter_speckle=filter_speckle, color_precision=color_precision,
@@ -287,9 +480,11 @@ async def trace_image(
             splice_threshold=splice_threshold, path_precision=path_precision,
         )
         svg_str = _run_vtracer(img_bytes, img_format, vt_params)
+        colors = _extract_svg_colors(svg_str)
         return JSONResponse({
             "success": True,
             "svg_base64": base64.b64encode(svg_str.encode('utf-8')).decode('utf-8'),
+            "colors": colors,
             "message": "Image traced successfully",
         })
     except HTTPException:
@@ -303,30 +498,32 @@ async def trace_image(
 @app.post("/api/trace-convert")
 async def trace_and_convert(
     file: UploadFile = File(...),
-    # vtracer parameters
-    colormode:        Optional[str]   = Form(None),
-    hierarchical:     Optional[str]   = Form(None),
-    mode:             Optional[str]   = Form(None),
-    filter_speckle:   Optional[int]   = Form(None),
-    color_precision:  Optional[int]   = Form(None),
-    layer_difference: Optional[int]   = Form(None),
-    corner_threshold: Optional[int]   = Form(None),
-    length_threshold: Optional[float] = Form(None),
-    max_iterations:   Optional[int]   = Form(None),
-    splice_threshold: Optional[int]   = Form(None),
-    path_precision:   Optional[int]   = Form(None),
-    # VP3 stitch parameters
-    fill_density:          Optional[float] = Form(None),
-    fill_stitch_length:    Optional[float] = Form(None),
-    satin_stitch_length:   Optional[float] = Form(None),
-    running_stitch_length: Optional[float] = Form(None),
-    underlay_density:      Optional[float] = Form(None),
-    max_stitch_length:     Optional[float] = Form(None),
-    min_stitch_length:     Optional[float] = Form(None),
-    satin_width_threshold: Optional[float] = Form(None),
-    underlay_angle:        Optional[float] = Form(None),
-    max_stitches_per_block:Optional[int]   = Form(None),
-    target_width_mm:       Optional[float] = Form(None),
+    remove_background:      Optional[str]   = Form(None),
+    bg_threshold:           Optional[int]   = Form(30),
+    colormode:              Optional[str]   = Form(None),
+    hierarchical:           Optional[str]   = Form(None),
+    mode:                   Optional[str]   = Form(None),
+    filter_speckle:         Optional[int]   = Form(None),
+    color_precision:        Optional[int]   = Form(None),
+    layer_difference:       Optional[int]   = Form(None),
+    corner_threshold:       Optional[int]   = Form(None),
+    length_threshold:       Optional[float] = Form(None),
+    max_iterations:         Optional[int]   = Form(None),
+    splice_threshold:       Optional[int]   = Form(None),
+    path_precision:         Optional[int]   = Form(None),
+    fill_density:           Optional[float] = Form(None),
+    fill_stitch_length:     Optional[float] = Form(None),
+    satin_stitch_length:    Optional[float] = Form(None),
+    running_stitch_length:  Optional[float] = Form(None),
+    underlay_density:       Optional[float] = Form(None),
+    max_stitch_length:      Optional[float] = Form(None),
+    min_stitch_length:      Optional[float] = Form(None),
+    satin_width_threshold:  Optional[float] = Form(None),
+    underlay_angle:         Optional[float] = Form(None),
+    max_stitches_per_block: Optional[int]   = Form(None),
+    target_width_mm:        Optional[float] = Form(None),
+    target_height_mm:       Optional[float] = Form(None),
+    color_map:              Optional[str]   = Form(None),
 ):
     if not VTRACER_AVAILABLE:
         raise HTTPException(status_code=503, detail="vtracer is not installed on the server")
@@ -335,6 +532,10 @@ async def trace_and_convert(
         raise HTTPException(status_code=400, detail="Unsupported image format.")
     try:
         img_bytes = await file.read()
+        if remove_background and remove_background.lower() == "true":
+            img_bytes = _remove_raster_background(img_bytes, threshold=bg_threshold or 30)
+            img_format = "png"
+
         vt_params = dict(
             colormode=colormode, hierarchical=hierarchical, mode=mode,
             filter_speckle=filter_speckle, color_precision=color_precision,
@@ -342,18 +543,32 @@ async def trace_and_convert(
             length_threshold=length_threshold, max_iterations=max_iterations,
             splice_threshold=splice_threshold, path_precision=path_precision,
         )
+
+        effective_width = target_width_mm
+        if target_height_mm and not target_width_mm:
+            effective_width = target_height_mm
+
         vp3_params = dict(
             fill_density=fill_density, fill_stitch_length=fill_stitch_length,
             satin_stitch_length=satin_stitch_length, running_stitch_length=running_stitch_length,
             underlay_density=underlay_density, max_stitch_length=max_stitch_length,
             min_stitch_length=min_stitch_length, satin_width_threshold=satin_width_threshold,
             underlay_angle=underlay_angle, max_stitches_per_block=max_stitches_per_block,
-            target_width_mm=target_width_mm,
+            target_width_mm=effective_width,
         )
 
         # Step 1: trace
         svg_str = _run_vtracer(img_bytes, img_format, vt_params)
+
+        if color_map:
+            try:
+                cmap = json.loads(color_map)
+                svg_str = _remap_svg_colors(svg_str, cmap)
+            except Exception as e:
+                print(f"color_map parse error: {e}")
+
         svg_b64 = base64.b64encode(svg_str.encode('utf-8')).decode('utf-8')
+        colors = _extract_svg_colors(svg_str)
 
         # Step 2: convert
         vp3_content, pattern = _convert_with_settings(svg_str, vp3_params)
@@ -366,6 +581,7 @@ async def trace_and_convert(
         return JSONResponse({
             "success": True,
             "svg_base64": svg_b64,
+            "colors": colors,
             "vp3_base64": base64.b64encode(vp3_content).decode('utf-8'),
             "preview_base64": _generate_preview_svg(pattern),
             "message": f"Traced and converted with {quality_assessment['level']} quality",
@@ -387,6 +603,7 @@ async def status():
     return JSONResponse({
         "vtracer": VTRACER_AVAILABLE,
         "pyembroidery": PYEMBROIDERY_AVAILABLE,
+        "pillow": PILLOW_AVAILABLE,
     })
 
 
