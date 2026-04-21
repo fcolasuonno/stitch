@@ -99,4 +99,4 @@ stitch/
 
 ---
 
-**ur/gd studios**
+Based on https://github.com/brandon-urgd/stitch by **ur/gd studios**
