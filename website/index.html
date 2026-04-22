@@ -824,15 +824,17 @@
                     </label>
                 </div>
                 <div class="param-group" id="bgThresholdGroup" style="display:none;">
-                    <label class="param-label" for="bgThreshold">Tolerance <span class="val" id="vv_bgThreshold"
-                            style="color:#f87171;">30</span></label>
+                    <label class="param-label" for="bgThreshold">Flood-fill tolerance <span class="val"
+                            id="vv_bgThreshold" style="color:#f87171;">30</span></label>
                     <input type="range" id="bgThreshold" min="5" max="120" value="30" step="5">
                 </div>
                 <div class="param-group" id="bgHintGroup" style="display:none;">
                     <p style="font-size:0.74rem;color:rgba(255,255,255,0.4);line-height:1.5;">
-                        Flood-fills from corners to remove the background colour.
-                        Increase tolerance for gradients / anti-aliased edges.
-                        For SVG files the background &lt;rect&gt; is removed automatically.
+                        Flood-fills outward from the image edges.
+                        Only pixels <em>connected to the border</em> are removed — so enclosed
+                        shapes (e.g. white text inside a black circle) are always preserved.
+                        Increase tolerance for anti-aliased or gradient edges.
+                        For SVG files the background &lt;rect&gt; is removed structurally, not by colour.
                     </p>
                 </div>
             </div>

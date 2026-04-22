@@ -42,14 +42,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── globals ──────────────────────────────────────────────────────────────────
 RASTER_TYPES = {
     "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
     "image/bmp": "bmp", "image/gif": "gif", "image/tiff": "tiff", "image/webp": "webp",
 }
 RASTER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".webp"}
-
-# Lock so concurrent requests don't stomp each other's PROFESSIONAL_SETTINGS patch
 _settings_lock = threading.Lock()
 
 
@@ -60,43 +57,9 @@ def _guess_format(filename: str, content_type: str) -> Optional[str]:
     return RASTER_TYPES.get(content_type)
 
 
-def _color_distance(c1, c2):
-    return sum((a - b) ** 2 for a, b in zip(c1[:3], c2[:3])) ** 0.5
-
-
-def _remove_raster_background(img_bytes: bytes, threshold: int = 30) -> bytes:
-    if not PILLOW_AVAILABLE:
-        raise RuntimeError("Pillow is not installed. Run: pip install Pillow")
-    img = PILImage.open(io.BytesIO(img_bytes)).convert("RGBA")
-    w, h = img.size
-    pixels = img.load()
-    corners = [
-        pixels[0, 0][:3], pixels[w - 1, 0][:3],
-        pixels[0, h - 1][:3], pixels[w - 1, h - 1][:3],
-    ]
-    bg_color = max(set(corners), key=corners.count)
-    visited = [[False] * h for _ in range(w)]
-    queue = []
-    for sx, sy in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
-        if _color_distance(pixels[sx, sy][:3], bg_color) <= threshold:
-            queue.append((sx, sy))
-            visited[sx][sy] = True
-    while queue:
-        x, y = queue.pop()
-        pixels[x, y] = (0, 0, 0, 0)
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < w and 0 <= ny < h and not visited[nx][ny]:
-                if _color_distance(pixels[nx, ny][:3], bg_color) <= threshold:
-                    visited[nx][ny] = True
-                    queue.append((nx, ny))
-    out = io.BytesIO()
-    img.save(out, format="PNG")
-    return out.getvalue()
-
-
+# ── colour helpers ────────────────────────────────────────────────────────────
 def _parse_svg_color(val: str) -> Optional[str]:
-    if not val or val in ("none", "transparent", "inherit", "currentColor"):
+    if not val or val.strip().lower() in ("none", "transparent", "inherit", "currentcolor"):
         return None
     val = val.strip()
     if val.startswith("#"):
@@ -111,10 +74,71 @@ def _parse_svg_color(val: str) -> Optional[str]:
     return None
 
 
-def _remove_svg_background(svg_str: str) -> str:
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)
+
+
+def _color_distance_sq(c1, c2) -> float:
+    return sum((a - b) ** 2 for a, b in zip(c1[:3], c2[:3]))
+
+
+# ── raster background removal (flood-fill, topologically correct) ─────────────
+# We use a "magic" marker colour that will not appear in any real design.
+# After tracing, vtracer turns the marker region into a path of that exact colour,
+# which we then auto-exclude from the SVG — leaving enclosed same-colour shapes
+# (e.g. white text inside a black circle) completely untouched.
+_BG_MARKER = (254, 1, 254)       # ~magenta; almost impossible in real artwork
+_BG_MARKER_HEX = "#fe01fe"
+
+def _flood_fill_background(img_bytes: bytes, threshold: int = 30) -> bytes:
+    """
+    BFS flood-fill from all four corners.  Pixels reachable from the border
+    that are within *threshold* colour-distance of the corner colour are
+    replaced with _BG_MARKER.  Enclosed pixels of the same colour are NOT
+    touched because they are not reachable from the edge.
+    Returns modified PNG bytes.
+    """
+    if not PILLOW_AVAILABLE:
+        raise RuntimeError("Pillow is not installed. Run: pip install Pillow")
+
+    img = PILImage.open(io.BytesIO(img_bytes)).convert("RGB")
+    w, h = img.size
+    pixels = img.load()
+
+    # Determine background colour from the four corners
+    corners = [pixels[0,0], pixels[w-1,0], pixels[0,h-1], pixels[w-1,h-1]]
+    bg = max(set(corners), key=corners.count)
+    thr2 = threshold ** 2
+
+    visited = [[False] * h for _ in range(w)]
+    queue = []
+    for sx, sy in [(0,0),(w-1,0),(0,h-1),(w-1,h-1)]:
+        if _color_distance_sq(pixels[sx,sy], bg) <= thr2:
+            visited[sx][sy] = True
+            queue.append((sx, sy))
+
+    while queue:
+        x, y = queue.pop()
+        pixels[x, y] = _BG_MARKER
+        for dx, dy in ((-1,0),(1,0),(0,-1),(0,1)):
+            nx, ny = x+dx, y+dy
+            if 0 <= nx < w and 0 <= ny < h and not visited[nx][ny]:
+                if _color_distance_sq(pixels[nx,ny], bg) <= thr2:
+                    visited[nx][ny] = True
+                    queue.append((nx, ny))
+
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+def _detect_svg_bg_color(svg_str: str) -> Optional[str]:
+    """
+    Return the fill colour of the first full-size background <rect> found in
+    the SVG, if any.  Also detects background <path> shapes from vtracer output
+    by looking at the first (bottom-most) filled path in the document.
+    """
     try:
-        ET.register_namespace("", "http://www.w3.org/2000/svg")
-        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
         root = ET.fromstring(svg_str)
         vb = root.get("viewBox", "")
         vb_parts = re.split(r"[\s,]+", vb.strip())
@@ -123,102 +147,51 @@ def _remove_svg_background(svg_str: str) -> str:
         svg_w = float(root.get("width", vb_w or 0) or vb_w or 0)
         svg_h = float(root.get("height", vb_h or 0) or vb_h or 0)
 
-        def is_background_rect(el):
-            tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
-            if tag != "rect":
-                return False
-            try:
-                rw_str = el.get("width", "0")
-                rh_str = el.get("height", "0")
-                rw = svg_w if "%" in rw_str else float(rw_str)
-                rh = svg_h if "%" in rh_str else float(rh_str)
-            except ValueError:
-                return False
-            rx = float(el.get("x", "0"))
-            ry = float(el.get("y", "0"))
-            if svg_w and svg_h:
-                if rw < svg_w * 0.9 or rh < svg_h * 0.9:
-                    return False
-            if rx != 0 or ry != 0:
-                return False
-            return True
+        def _fill(el):
+            f = el.get("fill") or ""
+            style = el.get("style", "")
+            if not f:
+                m = re.search(r"fill\s*:\s*([^;]+)", style)
+                if m:
+                    f = m.group(1).strip()
+            return _parse_svg_color(f)
 
-        def strip_bg(parent):
-            to_remove = []
-            for child in list(parent):
+        def _scan(el):
+            for child in el:
                 tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
-                if is_background_rect(child):
-                    to_remove.append(child)
-                elif tag not in ("defs", "style"):
-                    strip_bg(child)
-            for el in to_remove:
-                parent.remove(el)
+                if tag == "rect":
+                    try:
+                        rw_str = child.get("width", "0")
+                        rh_str = child.get("height", "0")
+                        rw = svg_w if "%" in rw_str else float(rw_str)
+                        rh = svg_h if "%" in rh_str else float(rh_str)
+                        rx = float(child.get("x", "0"))
+                        ry = float(child.get("y", "0"))
+                        if (svg_w and svg_h and
+                                rw >= svg_w * 0.9 and rh >= svg_h * 0.9 and
+                                rx == 0 and ry == 0):
+                            c = _fill(child)
+                            if c:
+                                return c
+                    except ValueError:
+                        pass
+                # For vtracer output: first path (or path in first group) is the background
+                if tag in ("path", "g"):
+                    c = _fill(child)
+                    if c:
+                        return c
+                result = _scan(child)
+                if result:
+                    return result
+            return None
 
-        strip_bg(root)
-        style = root.get("style", "")
-        style = re.sub(r"background(-color)?\s*:[^;]+;?", "", style, flags=re.I).strip()
-        if style:
-            root.set("style", style)
-        elif "style" in root.attrib:
-            del root.attrib["style"]
-        return ET.tostring(root, encoding="unicode", xml_declaration=False)
+        return _scan(root)
     except Exception as e:
-        print(f"SVG background removal failed: {e}")
-        return svg_str
+        print(f"SVG BG colour detection failed: {e}")
+        return None
 
 
-def _remap_svg_colors(svg_str: str, color_map: dict) -> str:
-    if not color_map:
-        return svg_str
-    norm_map = {}
-    for k, v in color_map.items():
-        nk = _parse_svg_color(k)
-        if nk:
-            norm_map[nk] = _parse_svg_color(v) if v else None
-
-    try:
-        ET.register_namespace("", "http://www.w3.org/2000/svg")
-        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
-        root = ET.fromstring(svg_str)
-
-        def remap_el(parent):
-            to_remove = []
-            for el in list(parent):
-                fill = _parse_svg_color(el.get("fill", ""))
-                stroke = _parse_svg_color(el.get("stroke", ""))
-                style_fill = None
-                style_str = el.get("style", "")
-                if style_str:
-                    m = re.search(r"fill\s*:\s*([^;]+)", style_str)
-                    if m:
-                        style_fill = _parse_svg_color(m.group(1).strip())
-                dominant = fill or style_fill or stroke
-                if dominant and dominant in norm_map:
-                    new_color = norm_map[dominant]
-                    if new_color is None:
-                        to_remove.append(el)
-                        continue
-                    else:
-                        if fill:
-                            el.set("fill", new_color)
-                        if stroke:
-                            el.set("stroke", new_color)
-                        if style_fill and style_str:
-                            new_style = re.sub(
-                                r"(fill\s*:)\s*[^;]+", r"\g<1>" + new_color, style_str
-                            )
-                            el.set("style", new_style)
-                remap_el(el)
-            for el in to_remove:
-                parent.remove(el)
-
-        remap_el(root)
-        return ET.tostring(root, encoding="unicode", xml_declaration=False)
-    except Exception as e:
-        print(f"SVG colour remap failed: {e}")
-        return svg_str
-
-
+# ── SVG colour tools ──────────────────────────────────────────────────────────
 def _extract_svg_colors(svg_str: str) -> list:
     colors = set()
     for pattern in [
@@ -235,12 +208,138 @@ def _extract_svg_colors(svg_str: str) -> list:
     return sorted(colors)
 
 
+def _remap_svg_colors(svg_str: str, color_map: dict) -> str:
+    """
+    Remap fill/stroke colours in an SVG.
+    color_map: { "#rrggbb": "#rrggbb" | null }
+    null → element removed.
+    """
+    if not color_map:
+        return svg_str
+    norm_map = {}
+    for k, v in color_map.items():
+        nk = _parse_svg_color(k)
+        if nk:
+            norm_map[nk] = _parse_svg_color(v) if v else None
+
+    try:
+        ET.register_namespace("", "http://www.w3.org/2000/svg")
+        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+        root = ET.fromstring(svg_str)
+
+        def _dominant_color(el):
+            fill = _parse_svg_color(el.get("fill", ""))
+            style_fill = None
+            style_str = el.get("style", "")
+            if style_str:
+                m = re.search(r"fill\s*:\s*([^;]+)", style_str)
+                if m:
+                    style_fill = _parse_svg_color(m.group(1).strip())
+            stroke = _parse_svg_color(el.get("stroke", ""))
+            return fill or style_fill or stroke, fill, style_fill, stroke, style_str
+
+        def remap_el(parent):
+            to_remove = []
+            for el in list(parent):
+                dominant, fill, style_fill, stroke, style_str = _dominant_color(el)
+                if dominant and dominant in norm_map:
+                    new_color = norm_map[dominant]
+                    if new_color is None:
+                        to_remove.append(el)
+                        continue
+                    if fill:
+                        el.set("fill", new_color)
+                    if stroke:
+                        el.set("stroke", new_color)
+                    if style_fill and style_str:
+                        el.set("style", re.sub(
+                            r"(fill\s*:)\s*[^;]+", r"\g<1>" + new_color, style_str
+                        ))
+                remap_el(el)
+            for el in to_remove:
+                parent.remove(el)
+
+        remap_el(root)
+        return ET.tostring(root, encoding="unicode", xml_declaration=False)
+    except Exception as e:
+        print(f"SVG colour remap failed: {e}")
+        return svg_str
+
+
+def _remove_svg_background(svg_str: str) -> str:
+    """
+    Remove explicit background rects from an SVG file (not vtracer output).
+    For vtracer output, use _detect_svg_bg_color + _remap_svg_colors instead.
+    """
+    try:
+        ET.register_namespace("", "http://www.w3.org/2000/svg")
+        ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+        root = ET.fromstring(svg_str)
+        vb = root.get("viewBox", "")
+        vb_parts = re.split(r"[\s,]+", vb.strip())
+        vb_w = float(vb_parts[2]) if len(vb_parts) >= 4 else None
+        vb_h = float(vb_parts[3]) if len(vb_parts) >= 4 else None
+        svg_w = float(root.get("width", vb_w or 0) or vb_w or 0)
+        svg_h = float(root.get("height", vb_h or 0) or vb_h or 0)
+
+        def is_bg_rect(el):
+            tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+            if tag != "rect":
+                return False
+            try:
+                rw_str = el.get("width", "0")
+                rh_str = el.get("height", "0")
+                rw = svg_w if "%" in rw_str else float(rw_str)
+                rh = svg_h if "%" in rh_str else float(rh_str)
+                rx = float(el.get("x", "0"))
+                ry = float(el.get("y", "0"))
+            except ValueError:
+                return False
+            if svg_w and svg_h:
+                if rw < svg_w * 0.9 or rh < svg_h * 0.9:
+                    return False
+            return rx == 0 and ry == 0
+
+        def strip_bg(parent):
+            to_remove = [c for c in list(parent) if is_bg_rect(c)]
+            for el in to_remove:
+                parent.remove(el)
+            for child in list(parent):
+                tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                if tag not in ("defs", "style"):
+                    strip_bg(child)
+
+        strip_bg(root)
+        style = root.get("style", "")
+        style = re.sub(r"background(-color)?\s*:[^;]+;?", "", style, flags=re.I).strip()
+        if style:
+            root.set("style", style)
+        elif "style" in root.attrib:
+            del root.attrib["style"]
+        return ET.tostring(root, encoding="unicode", xml_declaration=False)
+    except Exception as e:
+        print(f"SVG background rect removal failed: {e}")
+        return svg_str
+
+
+def _merge_color_maps(auto: Optional[str], user: Optional[str]) -> Optional[str]:
+    """Merge an auto-detected exclusion map with the user-supplied one."""
+    combined = {}
+    if auto:
+        try:
+            combined.update(json.loads(auto))
+        except Exception:
+            pass
+    if user:
+        try:
+            combined.update(json.loads(user))
+        except Exception:
+            pass
+    return json.dumps(combined) if combined else None
+
+
+# ── thread-safe settings patch ────────────────────────────────────────────────
 def _convert_with_settings(svg_content: str, vp3_params: dict):
-    """
-    Temporarily override PROFESSIONAL_SETTINGS for this conversion, then restore.
-    Uses a lock so concurrent requests are serialised around the global mutation.
-    """
-    # Filter out None values
     overrides = {k: v for k, v in vp3_params.items() if v is not None}
     original = dict(_converter_module.PROFESSIONAL_SETTINGS)
     with _settings_lock:
@@ -253,37 +352,25 @@ def _convert_with_settings(svg_content: str, vp3_params: dict):
     return result
 
 
-# ── embroidery preview ───────────────────────────────────────────────────────
+# ── embroidery preview ────────────────────────────────────────────────────────
 def _generate_preview_svg(pattern) -> str:
     if not PYEMBROIDERY_AVAILABLE or pattern is None:
-        print("Preview skipped: pyembroidery unavailable or pattern is None")
         return ""
     try:
         stitches = pattern.stitches
         if not stitches:
-            print("Preview skipped: No stitches in pattern")
             return ""
-        
-        # Filter for actual coordinates, excluding commands that don't have them
-        # (Though in pyembroidery most stitches have coordinates)
         xs = [s[0] for s in stitches]
         ys = [s[1] for s in stitches]
-        
         if not xs or not ys:
-            print("Preview skipped: No coordinates found")
             return ""
-            
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
-        
         padding = 50
         width = max_x - min_x + padding * 2
         height = max_y - min_y + padding * 2
-        
         if width <= 0 or height <= 0:
-            print(f"Preview skipped: Invalid dimensions {width}x{height}")
             return ""
-            
         thread_colors = []
         for t in pattern.threadlist:
             c = t.color
@@ -293,19 +380,15 @@ def _generate_preview_svg(pattern) -> str:
                 thread_colors.append('#' + t.hex.lstrip('#'))
             else:
                 thread_colors.append('#000000')
-                
         if not thread_colors:
             thread_colors = ['#000000']
-            
         lines = []
         current_points = []
         color_idx = 0
-        
         for s in stitches:
             x, y, cmd = s[0], s[1], s[2]
             sx = x - min_x + padding
             sy = y - min_y + padding
-            
             if cmd == pyembroidery.STITCH:
                 current_points.append(f"{sx:.1f},{sy:.1f}")
             elif cmd in (pyembroidery.COLOR_CHANGE, pyembroidery.COLOR_BREAK):
@@ -322,13 +405,10 @@ def _generate_preview_svg(pattern) -> str:
             elif cmd == pyembroidery.END:
                 break
             else:
-                # Other commands treat as movement
                 current_points.append(f"{sx:.1f},{sy:.1f}")
-                
         if len(current_points) >= 2:
             c = thread_colors[color_idx % len(thread_colors)]
             lines.append(f'<polyline points="{" ".join(current_points)}" fill="none" stroke="{c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>')
-            
         svg = (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}"'
             f' width="600" height="{600 * height / width:.0f}"'
@@ -349,6 +429,7 @@ def _run_vtracer(img_bytes: bytes, img_format: str, params: dict) -> str:
     return vtracer.convert_raw_image_to_svg(img_bytes, img_format=img_format, **clean)
 
 
+# ── /api/extract-colors ───────────────────────────────────────────────────────
 @app.post("/api/extract-colors")
 async def extract_colors(
     file: UploadFile = File(None),
@@ -363,7 +444,8 @@ async def extract_colors(
         else:
             raise HTTPException(status_code=400, detail="Provide file or svg_base64")
         colors = _extract_svg_colors(svg_str)
-        return JSONResponse({"success": True, "colors": colors})
+        bg_color = _detect_svg_bg_color(svg_str)
+        return JSONResponse({"success": True, "colors": colors, "bg_color": bg_color})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -397,15 +479,23 @@ async def convert_svg(
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="Invalid SVG file encoding")
 
-        if remove_background and remove_background.lower() == "true":
-            svg_content = _remove_svg_background(svg_content)
+        bg_color = None
+        auto_cmap = None
 
-        if color_map:
+        if remove_background and remove_background.lower() == "true":
+            # Detect + remove explicit background rect
+            bg_color = _detect_svg_bg_color(svg_content)
+            svg_content = _remove_svg_background(svg_content)
+            if bg_color:
+                auto_cmap = json.dumps({bg_color: None})
+
+        # Merge auto exclusion with user colour map, then apply
+        merged = _merge_color_maps(auto_cmap, color_map)
+        if merged:
             try:
-                cmap = json.loads(color_map)
-                svg_content = _remap_svg_colors(svg_content, cmap)
+                svg_content = _remap_svg_colors(svg_content, json.loads(merged))
             except Exception as e:
-                print(f"color_map parse error: {e}")
+                print(f"color_map error: {e}")
 
         effective_width = target_width_mm
         if target_height_mm and not target_width_mm:
@@ -436,6 +526,7 @@ async def convert_svg(
             "stitchCount": actual_stitch_count,
             "complexity": quality_assessment['complexity'],
             "dimensions": quality_assessment['dimensions'],
+            "bg_color": bg_color,
         })
     except HTTPException:
         raise
@@ -469,9 +560,19 @@ async def trace_image(
         raise HTTPException(status_code=400, detail="Unsupported image format.")
     try:
         img_bytes = await file.read()
+
+        # Flood-fill the image from its edges, replacing background pixels with
+        # a "magic" marker colour (#fe01fe).  Enclosed same-colour pixels are
+        # NOT reachable from the border, so they are preserved.
+        # After tracing, we auto-exclude just that marker colour from the SVG.
+        bg_color = None
+        auto_cmap = None
         if remove_background and remove_background.lower() == "true":
-            img_bytes = _remove_raster_background(img_bytes, threshold=bg_threshold or 30)
+            img_bytes = _flood_fill_background(img_bytes, threshold=bg_threshold or 30)
             img_format = "png"
+            bg_color = _BG_MARKER_HEX
+            auto_cmap = json.dumps({_BG_MARKER_HEX: None})
+
         vt_params = dict(
             colormode=colormode, hierarchical=hierarchical, mode=mode,
             filter_speckle=filter_speckle, color_precision=color_precision,
@@ -480,11 +581,17 @@ async def trace_image(
             splice_threshold=splice_threshold, path_precision=path_precision,
         )
         svg_str = _run_vtracer(img_bytes, img_format, vt_params)
+
+        # Remove the marker colour paths from the traced SVG
+        if auto_cmap:
+            svg_str = _remap_svg_colors(svg_str, json.loads(auto_cmap))
+
         colors = _extract_svg_colors(svg_str)
         return JSONResponse({
             "success": True,
             "svg_base64": base64.b64encode(svg_str.encode('utf-8')).decode('utf-8'),
             "colors": colors,
+            "bg_color": bg_color,
             "message": "Image traced successfully",
         })
     except HTTPException:
@@ -494,7 +601,7 @@ async def trace_image(
         raise HTTPException(status_code=500, detail=f"Tracing failed: {str(e)}")
 
 
-# ── /api/trace-convert  (raster → SVG → VP3) ────────────────────────────────
+# ── /api/trace-convert  (raster → SVG → VP3) ─────────────────────────────────
 @app.post("/api/trace-convert")
 async def trace_and_convert(
     file: UploadFile = File(...),
@@ -532,9 +639,17 @@ async def trace_and_convert(
         raise HTTPException(status_code=400, detail="Unsupported image format.")
     try:
         img_bytes = await file.read()
+
+        # Flood-fill from edges, replacing background pixels with the magic marker.
+        # Topologically correct: enclosed same-colour shapes are not reachable
+        # from the border and are therefore preserved.
+        bg_color = None
+        auto_cmap = None
         if remove_background and remove_background.lower() == "true":
-            img_bytes = _remove_raster_background(img_bytes, threshold=bg_threshold or 30)
+            img_bytes = _flood_fill_background(img_bytes, threshold=bg_threshold or 30)
             img_format = "png"
+            bg_color = _BG_MARKER_HEX
+            auto_cmap = json.dumps({_BG_MARKER_HEX: None})
 
         vt_params = dict(
             colormode=colormode, hierarchical=hierarchical, mode=mode,
@@ -557,20 +672,19 @@ async def trace_and_convert(
             target_width_mm=effective_width,
         )
 
-        # Step 1: trace
         svg_str = _run_vtracer(img_bytes, img_format, vt_params)
 
-        if color_map:
+        # Merge auto BG exclusion with any user colour remaps, then apply
+        merged = _merge_color_maps(auto_cmap, color_map)
+        if merged:
             try:
-                cmap = json.loads(color_map)
-                svg_str = _remap_svg_colors(svg_str, cmap)
+                svg_str = _remap_svg_colors(svg_str, json.loads(merged))
             except Exception as e:
-                print(f"color_map parse error: {e}")
+                print(f"color_map error: {e}")
 
         svg_b64 = base64.b64encode(svg_str.encode('utf-8')).decode('utf-8')
         colors = _extract_svg_colors(svg_str)
 
-        # Step 2: convert
         vp3_content, pattern = _convert_with_settings(svg_str, vp3_params)
         if not vp3_content:
             raise HTTPException(status_code=500, detail="VP3 conversion failed after tracing")
@@ -582,6 +696,7 @@ async def trace_and_convert(
             "success": True,
             "svg_base64": svg_b64,
             "colors": colors,
+            "bg_color": bg_color,
             "vp3_base64": base64.b64encode(vp3_content).decode('utf-8'),
             "preview_base64": _generate_preview_svg(pattern),
             "message": f"Traced and converted with {quality_assessment['level']} quality",
@@ -597,7 +712,7 @@ async def trace_and_convert(
         raise HTTPException(status_code=500, detail=f"Trace-convert failed: {str(e)}")
 
 
-# ── /api/status ──────────────────────────────────────────────────────────────
+# ── /api/status ───────────────────────────────────────────────────────────────
 @app.get("/api/status")
 async def status():
     return JSONResponse({
@@ -607,7 +722,7 @@ async def status():
     })
 
 
-# ── static frontend ──────────────────────────────────────────────────────────
+# ── static frontend ───────────────────────────────────────────────────────────
 app.mount("/", StaticFiles(directory="website", html=True), name="website")
 
 if __name__ == "__main__":

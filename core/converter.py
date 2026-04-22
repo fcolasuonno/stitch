@@ -66,6 +66,7 @@ PROFESSIONAL_SETTINGS = {
     'underlay_angle':       90,    # degrees
     'max_stitches_per_block':8000,
     'target_width_mm':      100.0, # output design width
+    'target_height_mm':     None,  # optional height constraint (for hoop sizing)
 }
 
 def _get_settings(overrides: Optional[Dict[str, Any]] = None) -> dict:
@@ -112,18 +113,29 @@ _NAMED_COLORS: Dict[str, str] = {
     'gray':'#808080','grey':'#808080','none':'none',
 }
 
-def _normalize_color(c: Optional[str]) -> str:
-    if not c or c.strip() == '' or c.lower() == 'none':
-        return 'none'
+def _normalize_color(c: Optional[str], inherited: str = 'none') -> str:
+    """
+    Normalise an SVG colour value.
+    - None / '' / 'none'         → 'none'
+    - 'inherit' / 'currentColor' → `inherited` (caller passes the parent value)
+    - named colours, #hex, rgb() → normalised hex
+    """
+    if not c or c.strip() == '':
+        return inherited          # absent attribute → use inherited value
     c = c.strip()
+    cl = c.lower()
+    if cl == 'none':
+        return 'none'
+    if cl in ('inherit', 'currentcolor'):
+        return inherited
     if c.startswith('#'):
         h = c.lstrip('#')
         if len(h) == 3:
             h = h[0]*2 + h[1]*2 + h[2]*2
         return '#' + h.lower()
-    if c.lower() in _NAMED_COLORS:
-        return _NAMED_COLORS[c.lower()]
-    if c.startswith('rgb'):
+    if cl in _NAMED_COLORS:
+        return _NAMED_COLORS[cl]
+    if cl.startswith('rgb'):
         nums = re.findall(r'\d+', c)
         if len(nums) >= 3:
             return '#{:02x}{:02x}{:02x}'.format(int(nums[0]), int(nums[1]), int(nums[2]))
@@ -440,10 +452,37 @@ def extract_svg_elements_v2(svg_content: str):
     else:
         svg_w, svg_h = 100.0, 100.0
 
+    # Many icon sources (Noun Project, Adobe Illustrator export) set
+    # viewBox taller than the actual artwork to make room for attribution
+    # text at the bottom (e.g. viewBox="0 0 100 125" but content is 100×100).
+    # Detect this via the legacy `enable-background` style property and use
+    # its dimensions instead so scaling is based on the real artwork area.
+    root_style = root.get('style', '')
+    eb_match = re.search(
+        r'enable-background\s*:\s*new\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)',
+        root_style, re.I
+    )
+    if eb_match:
+        eb_w = float(eb_match.group(3))
+        eb_h = float(eb_match.group(4))
+        if eb_w > 0 and eb_h > 0 and eb_w <= svg_w and eb_h <= svg_h:
+            print(f"Adjusting SVG dimensions from {svg_w}×{svg_h} to {eb_w}×{eb_h} "
+                  f"(enable-background override — removes attribution text padding)")
+            svg_w, svg_h = eb_w, eb_h
+
+    # SVG specification defaults: fill is black, stroke is none.
+    # Starting with these means elements with no explicit fill/stroke attributes
+    # inherit black fill — matching browser rendering (fixes Noun Project icons etc.)
+    SVG_SPEC_DEFAULTS = {
+        'fill': '#000000',
+        'stroke': 'none',
+        'stroke-width': '1',
+    }
+
     elements = []
-    for elem, props, mat, tag in _traverse(root, {}, _identity(), css_classes):
-        fill   = _normalize_color(props.get('fill'))
-        stroke = _normalize_color(props.get('stroke'))
+    for elem, props, mat, tag in _traverse(root, SVG_SPEC_DEFAULTS, _identity(), css_classes):
+        fill   = _normalize_color(props.get('fill'),         inherited='#000000')
+        stroke = _normalize_color(props.get('stroke'),       inherited='none')
         try:
             sw = float(props.get('stroke-width', '1').replace('px',''))
         except Exception:
@@ -726,6 +765,28 @@ _FILL_ANGLES = {
 def _fill_angle_for(color: str) -> float:
     return _FILL_ANGLES.get(color.lower(), 45.0)
 
+def _shape_aspect(pts) -> float:
+    """Bounding-box aspect ratio (long side / short side). 1.0 = square/circle."""
+    minx, miny, maxx, maxy = _bbox(pts)
+    w, h = maxx - minx, maxy - miny
+    short = min(w, h)
+    if short < 0.01:
+        return 999.0
+    return max(w, h) / short
+
+def _satin_angle_for_shape(pts, default_angle: float) -> float:
+    """
+    For elongated shapes, return the angle perpendicular to the long axis so
+    satin stitches cross the shape width-wise (more natural look).
+    For compact shapes, return the default angle.
+    """
+    minx, miny, maxx, maxy = _bbox(pts)
+    w, h = maxx - minx, maxy - miny
+    if _shape_aspect(pts) < 2.0:
+        return default_angle          # compact — any angle is fine
+    # Elongated: stitches should cross the SHORT axis
+    return 0.0 if w > h else 90.0    # horizontal for wide, vertical for tall
+
 def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = None):
     """Convert SVG to pyembroidery pattern with correct colours, satin & fill."""
     elements, svg_w, svg_h = extract_svg_elements_v2(svg_content)
@@ -762,15 +823,68 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
                 if closed[0] != closed[-1]:
                     closed.append(closed[0])
 
-                narrow = _shape_narrow_width(closed)
-                angle  = _fill_angle_for(fill)
+                narrow  = _shape_narrow_width(closed)
+                aspect  = _shape_aspect(closed)
+                color_angle = _fill_angle_for(fill)
 
-                if narrow < s['satin_width_threshold']:
-                    # Satin for narrow shapes (legs, narrow body segments)
-                    stitches = generate_satin_column(scaled, width_mm=max(1.0, narrow*0.9), settings=settings)
+                # ── Stitch type decision ──────────────────────────────────
+                #
+                # generate_satin_column() is a SPINE-based generator: it
+                # resamples an open path and fires perpendicular stitches
+                # across the spine.  It works well for open/elongated paths
+                # (letter stems, ribbons, outlines) but produces chaotic
+                # results on CLOSED compact shapes (circles, blobs) because
+                # it follows the perimeter and the inward stitches overlap
+                # and criss-cross in the interior.
+                #
+                # Rule:
+                #   • narrow < threshold  AND  aspect ≥ 2.5  →  satin COLUMN
+                #     (narrow + elongated = a ribbon or curved stem)
+                #   • narrow < threshold  AND  aspect < 2.5  →  dense FILL
+                #     (compact small shape → satin-like dense scanline)
+                #   • narrow ≥ threshold                     →  tatami FILL
+                #     (large shape → underlay + tatami scanline)
+
+                ELONGATED = 2.5   # aspect ratio threshold for satin column
+
+                if narrow < s['satin_width_threshold'] and aspect >= ELONGATED:
+                    # Narrow AND elongated (ribbon, stem, arm) → satin column
+                    # Use dense scanline perpendicular to long axis — each row is one
+                    # crossing stitch (true satin), no chaotic perimeter-following.
+                    satin_angle = _satin_angle_for_shape(closed, color_angle)
+                    stitches = generate_scanline_fill(
+                        closed,
+                        row_spacing=s['satin_stitch_length'],
+                        stitch_length=s['max_stitch_length'],
+                        angle_deg=satin_angle,
+                        settings=settings,
+                    )
+                    if not stitches:
+                        # Fallback: path-based satin column
+                        stitches = generate_satin_column(
+                            scaled,
+                            width_mm=max(1.0, narrow * 0.9),
+                            settings=settings,
+                        )
+
+                elif narrow < s['satin_width_threshold']:
+                    # Compact and small → dense satin fill
+                    # row_spacing = satin density (0.4 mm) for tight parallel rows
+                    # stitch_length = max_stitch_length (12 mm) so each row is a
+                    # SINGLE crossing stitch from one edge to the other — true satin
+                    satin_angle = _satin_angle_for_shape(closed, color_angle)
+                    stitches = generate_scanline_fill(
+                        closed,
+                        row_spacing=s['satin_stitch_length'],
+                        stitch_length=s['max_stitch_length'],
+                        angle_deg=satin_angle,
+                        settings=settings,
+                    )
+
                 else:
-                    # Underlay + tatami fill for wide shapes
-                    underlay = generate_underlay(closed, angle_deg=angle+90, settings=settings)
+                    # Large shape → underlay + tatami fill
+                    angle = _satin_angle_for_shape(closed, color_angle)
+                    underlay = generate_underlay(closed, angle_deg=angle + 90, settings=settings)
                     fill_st  = generate_scanline_fill(closed, angle_deg=angle, settings=settings)
                     stitches = underlay + fill_st
 
@@ -780,7 +894,8 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
                                           'stitches': stitches,
                                           'type': 'fill'})
                 else:
-                    print(f"Element {i} ({el['tag']}) fill produced 0 stitches (narrow={narrow:.2f}mm)")
+                    print(f"Element {i} ({el['tag']}) fill produced 0 stitches "
+                          f"(narrow={narrow:.2f}mm, aspect={aspect:.1f})")
 
             # ── stroked outline ──────────────────────────────────────────
             if stroke and stroke != 'none' and sw > 0:
