@@ -55,11 +55,11 @@ except ImportError:
 
 # ── professional stitch settings ────────────────────────────────────────────
 PROFESSIONAL_SETTINGS = {
-    'fill_density':         2.0,   # mm between rows
+    'fill_density':         0.4,   # mm between rows (0.4mm = standard dense tatami fill)
     'fill_stitch_length':   3.0,   # mm (tatami stitch length)
     'satin_stitch_length':  0.4,   # mm between satin needle-fall points
     'running_stitch_length':2.5,   # mm
-    'underlay_density':     4.0,   # mm between underlay rows
+    'underlay_density':     1.5,   # mm between underlay rows
     'max_stitch_length':    12.0,  # mm (VP3 safety cap)
     'min_stitch_length':    0.3,   # mm
     'satin_width_threshold':8.0,   # mm — shapes narrower than this → satin
@@ -579,6 +579,115 @@ def _shape_narrow_width(pts):
     w = maxx - minx; h = maxy - miny
     return min(w, h)
 
+
+# ── polygon simplification ────────────────────────────────────────────────────
+def _douglas_peucker(pts: List[Tuple[float,float]],
+                     epsilon: float) -> List[Tuple[float,float]]:
+    """
+    Douglas-Peucker polyline simplification.
+    Removes vertices that deviate less than epsilon mm from the simplified line.
+    Used to de-noise vtracer polygon output (1000+ micro-vertices) before
+    computing scanline fills and running-stitch outlines.
+    """
+    if len(pts) < 3:
+        return list(pts)
+    start, end = pts[0], pts[-1]
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    line_len = math.hypot(dx, dy)
+    max_dist, max_idx = 0.0, 0
+    if line_len == 0:
+        for i in range(1, len(pts) - 1):
+            d = math.hypot(pts[i][0] - start[0], pts[i][1] - start[1])
+            if d > max_dist:
+                max_dist, max_idx = d, i
+    else:
+        inv_len = 1.0 / line_len
+        for i in range(1, len(pts) - 1):
+            d = abs(dy * pts[i][0] - dx * pts[i][1] +
+                    end[0] * start[1] - end[1] * start[0]) * inv_len
+            if d > max_dist:
+                max_dist, max_idx = d, i
+    if max_dist > epsilon:
+        left  = _douglas_peucker(pts[:max_idx + 1], epsilon)
+        right = _douglas_peucker(pts[max_idx:],     epsilon)
+        return left[:-1] + right
+    return [start, end]
+
+
+def _simplify_polygon(pts: List[Tuple[float,float]],
+                      epsilon: float = 0.3) -> List[Tuple[float,float]]:
+    """Simplify a closed polygon. Keeps at least 4 vertices."""
+    if len(pts) < 4:
+        return pts
+    # Treat as open polyline for DP, then close
+    simplified = _douglas_peucker(pts, epsilon)
+    if len(simplified) < 4:
+        return pts          # fallback: original if too aggressive
+    # Close if not already
+    if simplified[0] != simplified[-1]:
+        simplified.append(simplified[0])
+    return simplified
+
+# ── compound path grouping (nest holes with their outer shape) ────────────────
+def _point_in_polygon(px: float, py: float, poly: List[Tuple[float,float]]) -> bool:
+    """Ray-casting point-in-polygon test."""
+    n = len(poly)
+    inside = False
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i+1) % n]
+        if (y1 <= py < y2) or (y2 <= py < y1):
+            if px < x1 + (py - y1) / (y2 - y1) * (x2 - x1):
+                inside = not inside
+    return inside
+
+def _bbox_contains(outer: tuple, inner: tuple) -> bool:
+    """True if inner bounding box is fully inside outer bounding box."""
+    return outer[0] <= inner[0] and outer[1] <= inner[1] and outer[2] >= inner[2] and outer[3] >= inner[3]
+
+def group_compound_subpaths(subpaths: List[List[Tuple[float,float]]]) -> List[List[List[Tuple[float,float]]]]:
+    """
+    Group subpaths of a compound SVG path into (outer, holes...) clusters.
+
+    Even-odd fill rule is only valid when subpaths are NESTED (inner = hole in
+    outer).  Sibling subpaths (separate non-overlapping shapes in the same
+    compound path) must be filled INDEPENDENTLY — running them through a shared
+    even-odd scanline fill causes the gaps between them to get filled as well.
+
+    Algorithm:
+      1. Sort by bbox area descending.
+      2. For each unassigned subpath, find all unassigned subpaths whose bbox is
+         fully inside it AND whose first point is inside it (confirmed nesting).
+      3. Each such cluster becomes one group [outer, *holes].
+    """
+    if not subpaths:
+        return []
+    bboxes = [_bbox(sp) for sp in subpaths]
+    areas = [(bboxes[i][2] - bboxes[i][0]) * (bboxes[i][3] - bboxes[i][1])
+             for i in range(len(subpaths))]
+    order = sorted(range(len(subpaths)), key=lambda i: -areas[i])
+
+    assigned = [False] * len(subpaths)
+    groups: List[List[List[Tuple[float,float]]]] = []
+
+    for idx in order:
+        if assigned[idx]:
+            continue
+        assigned[idx] = True
+        group = [subpaths[idx]]
+        for jdx in order:
+            if assigned[jdx]:
+                continue
+            if _bbox_contains(bboxes[idx], bboxes[jdx]):
+                test_pt = subpaths[jdx][0]
+                if _point_in_polygon(test_pt[0], test_pt[1], subpaths[idx]):
+                    group.append(subpaths[jdx])
+                    assigned[jdx] = True
+        groups.append(group)
+
+    return groups
+
 # ── scanline fill ────────────────────────────────────────────────────────────
 def generate_scanline_fill(polygon: List[Tuple[float,float]],
                            row_spacing: float = None,
@@ -651,6 +760,215 @@ def generate_underlay(polygon: List[Tuple[float,float]],
                       settings: Optional[dict] = None) -> List[Tuple[float,float]]:
     s = _get_settings(settings)
     return generate_scanline_fill(polygon,
+                                  row_spacing=s['underlay_density'],
+                                  stitch_length=4.0,
+                                  angle_deg=angle_deg,
+                                  settings=settings)
+
+# ── compound scanline fill (proper segment subtraction for holes) ─────────────
+def _fill_segments_at_y(polygons_rotated, y):
+    """
+    Compute fill x-segments at scan-line y for a list of rotated polygons.
+
+    polygons_rotated[0] = outer, polygons_rotated[1:] = holes.
+
+    Algorithm (correct for all cases — nested, sibling, overlapping holes):
+      1. Find x-intersections of the OUTER polygon → base fill segments.
+      2. For each hole, find its x-intersections → hole ranges.
+      3. Union (merge) all hole ranges.
+      4. Subtract merged hole ranges from the base fill segments.
+
+    Returns list of (x_start, x_end) segments.
+    """
+    def poly_xs(poly_r, y_val):
+        n = len(poly_r)
+        xs = []
+        for i in range(n):
+            p1, p2 = poly_r[i], poly_r[(i+1) % n]
+            y1, y2 = p1[1], p2[1]
+            if (y1 <= y_val < y2) or (y2 <= y_val < y1):
+                t = (y_val - y1) / (y2 - y1)
+                xs.append(p1[0] + t * (p2[0] - p1[0]))
+        return sorted(xs)
+
+    # Step 1: outer fill segments
+    outer_xs = poly_xs(polygons_rotated[0], y)
+    if len(outer_xs) < 2:
+        return []
+    fill_segs = [(outer_xs[k] + 0.2, outer_xs[k+1] - 0.2)
+                 for k in range(0, len(outer_xs) - 1, 2)
+                 if outer_xs[k+1] - outer_xs[k] > 0.4]
+
+    if not fill_segs or len(polygons_rotated) == 1:
+        return fill_segs
+
+    # Step 2: collect all hole x-ranges
+    hole_ranges = []
+    for poly_r in polygons_rotated[1:]:
+        hxs = poly_xs(poly_r, y)
+        for k in range(0, len(hxs) - 1, 2):
+            if hxs[k+1] > hxs[k]:
+                hole_ranges.append((hxs[k], hxs[k+1]))
+
+    if not hole_ranges:
+        return fill_segs
+
+    # Step 3: merge overlapping hole ranges
+    hole_ranges.sort()
+    merged = [list(hole_ranges[0])]
+    for hs, he in hole_ranges[1:]:
+        if hs <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], he)
+        else:
+            merged.append([hs, he])
+
+    # Step 4: subtract merged holes from fill segments
+    result = []
+    INSET = 0.3   # mm clearance from hole boundaries
+    for fs, fe in fill_segs:
+        current = [(fs, fe)]
+        for hs, he in merged:
+            next_segs = []
+            for cs, ce in current:
+                if he <= cs or hs >= ce:
+                    next_segs.append((cs, ce))          # no overlap
+                else:
+                    left = (cs, hs - INSET)             # fragment left of hole
+                    right = (he + INSET, ce)            # fragment right of hole
+                    if left[1] > left[0] + INSET:
+                        next_segs.append(left)
+                    if right[1] > right[0] + INSET:
+                        next_segs.append(right)
+            current = next_segs
+        result.extend(current)
+
+    return result
+
+
+def compound_scanline_fill(polygons: List[List[Tuple[float,float]]],
+                           row_spacing: float = None,
+                           stitch_length: float = None,
+                           angle_deg: float = 0.0,
+                           settings: Optional[dict] = None) -> List[List[Tuple[float,float]]]:
+    """
+    Fill a compound path (outer + holes) using correct segment subtraction.
+
+    Uses slot-based row merging: segments from adjacent rows that cover the same
+    x-band (≥30% overlap) are joined into one continuous stitch run. This produces
+    long continuous needle-fall sequences rather than 2-3 point fragments.
+
+    Returns List[List[Tuple]] — one list per continuous stitch run.
+    Callers emit TRIM+JUMP between runs; _cap_stitch_distance only applied within runs.
+    """
+    valid = [p for p in polygons if len(p) >= 3]
+    if not valid:
+        return []
+
+    s = _get_settings(settings)
+    row_spacing   = row_spacing   or s['fill_density']
+    stitch_length = stitch_length or s['fill_stitch_length']
+
+    ang = math.radians(-angle_deg)
+    ca, sa = math.cos(ang), math.sin(ang)
+    rot_in  = lambda p: ( ca*p[0] - sa*p[1],  sa*p[0] + ca*p[1])
+    rot_out = lambda p: ( ca*p[0] + sa*p[1], -sa*p[0] + ca*p[1])
+
+    rotated = [[rot_in(p) for p in poly] for poly in valid]
+    all_pts = [p for poly in rotated for p in poly]
+    miny = min(p[1] for p in all_pts)
+    maxy = max(p[1] for p in all_pts)
+
+    # open_slots: list of dicts {x_s, x_e, pts}
+    open_slots = []
+    finished   = []
+
+    row = 0
+    y   = miny + row_spacing / 2
+
+    while y <= maxy:
+        raw = _fill_segments_at_y(rotated, y)
+
+        # Build stitch points for each fill segment this row
+        row_slots = []
+        for x_s, x_e in raw:
+            pts = []
+            if row % 2 == 0:
+                xi = x_s
+                while xi <= x_e + 1e-6:
+                    pts.append(rot_out((xi, y)))
+                    xi += stitch_length
+            else:
+                xi = x_e
+                while xi >= x_s - 1e-6:
+                    pts.append(rot_out((xi, y)))
+                    xi -= stitch_length
+            if pts:
+                row_slots.append({'x_s': x_s, 'x_e': x_e, 'pts': pts})
+
+        # Match this row's slots to open slots by x-range overlap
+        matched_open = set()
+        matched_new  = set()
+        merge_pairs  = []  # (open_idx, new_idx)
+
+        for ni, ns in enumerate(row_slots):
+            best_oi, best_frac = -1, 0.0
+            for oi, os in enumerate(open_slots):
+                if oi in matched_open:
+                    continue
+                overlap = min(ns['x_e'], os['x_e']) - max(ns['x_s'], os['x_s'])
+                if overlap > 0:
+                    smaller = min(ns['x_e'] - ns['x_s'], os['x_e'] - os['x_s'])
+                    frac = overlap / max(smaller, 0.01)
+                    if frac > best_frac:
+                        best_frac = frac
+                        best_oi   = oi
+            if best_oi >= 0 and best_frac >= 0.3:
+                merge_pairs.append((best_oi, ni))
+                matched_open.add(best_oi)
+                matched_new.add(ni)
+
+        # Close unmatched open slots
+        for oi, os in enumerate(open_slots):
+            if oi not in matched_open:
+                finished.append(os['pts'])
+
+        # Extend matched open slots
+        new_open = []
+        for oi, ni in merge_pairs:
+            open_slots[oi]['pts'].extend(row_slots[ni]['pts'])
+            open_slots[oi]['x_s'] = row_slots[ni]['x_s']
+            open_slots[oi]['x_e'] = row_slots[ni]['x_e']
+            new_open.append(open_slots[oi])
+
+        # Start new slots for unmatched new segments
+        for ni, ns in enumerate(row_slots):
+            if ni not in matched_new:
+                new_open.append({'x_s': ns['x_s'], 'x_e': ns['x_e'], 'pts': list(ns['pts'])})
+
+        open_slots = new_open
+        row += 1
+        y   += row_spacing
+
+    # Close remaining open slots
+    for os in open_slots:
+        finished.append(os['pts'])
+
+    return [seg for seg in finished if seg]
+
+
+
+def compound_scanline_fill_flat(polygons, row_spacing=None, stitch_length=None,
+                                angle_deg=0.0, settings=None):
+    """Flat (legacy) version — returns one list of points. Only for single-polygon fills."""
+    segs = compound_scanline_fill(polygons, row_spacing, stitch_length, angle_deg, settings)
+    return [pt for seg in segs for pt in seg]
+
+
+def compound_underlay(polygons: List[List[Tuple[float,float]]],
+                      angle_deg: float = 0.0,
+                      settings: Optional[dict] = None) -> List[List[Tuple[float,float]]]:
+    s = _get_settings(settings)
+    return compound_scanline_fill(polygons,
                                   row_spacing=s['underlay_density'],
                                   stitch_length=4.0,
                                   angle_deg=angle_deg,
@@ -753,17 +1071,19 @@ def _cap_stitch_distance(stitches, max_mm=None, settings=None):
     return out
 
 # ── main conversion ──────────────────────────────────────────────────────────
-# Per-colour fill angle variation (so different coloured areas look distinct)
+# Per-colour fill angle variation — gives each colour a distinct stitch direction.
+# 0° = horizontal stitches (cleanest look for most shapes).
+# Avoid 45° as default: it makes axis-aligned shapes look skewed/diagonal.
 _FILL_ANGLES = {
-    '#676767': 45.0,
-    '#3a3939': 135.0,
-    '#dd2e2f': 60.0,
+    '#676767': 0.0,
+    '#3a3939': 90.0,
+    '#dd2e2f': 30.0,
     '#ffffff': 90.0,
-    '#000000': 45.0,
+    '#000000': 0.0,   # horizontal — clean for axis-aligned designs
 }
 
 def _fill_angle_for(color: str) -> float:
-    return _FILL_ANGLES.get(color.lower(), 45.0)
+    return _FILL_ANGLES.get(color.lower(), 0.0)  # default 0°, not 45°
 
 def _shape_aspect(pts) -> float:
     """Bounding-box aspect ratio (long side / short side). 1.0 = square/circle."""
@@ -808,110 +1128,112 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
         stroke = el['stroke']
         sw     = el['stroke_width']
 
-        for subpath in subpaths:
-            if not subpath:
-                continue
-            # Apply transform then scale to mm
-            transformed = _apply_matrix(subpath, mat)
-            scaled       = scale_coords(transformed, svg_w, svg_h, settings=settings)
-            if len(scaled) < 2:
-                continue
+        # ── filled area — process ALL subpaths of this element together ──────
+        # Step 1: group subpaths into (outer, *holes) clusters so that nested
+        #         subpaths share a compound scanline fill (even-odd rule) while
+        #         sibling subpaths (separate non-overlapping shapes in the same
+        #         compound path) are filled independently.
+        if fill and fill != 'none':
+            scaled_subpaths = []
+            for subpath in subpaths:
+                if not subpath:
+                    continue
+                transformed = _apply_matrix(subpath, mat)
+                sc = scale_coords(transformed, svg_w, svg_h, settings=settings)
+                if len(sc) >= 3:
+                    closed = list(sc)
+                    if closed[0] != closed[-1]:
+                        closed.append(closed[0])
+                    scaled_subpaths.append(closed)
 
-            # ── filled area ──────────────────────────────────────────────
-            if fill and fill != 'none' and len(scaled) >= 3:
-                closed = list(scaled)
-                if closed[0] != closed[-1]:
-                    closed.append(closed[0])
-
-                narrow  = _shape_narrow_width(closed)
-                aspect  = _shape_aspect(closed)
+            if scaled_subpaths:
+                # Simplify each subpath to remove vtracer micro-vertices.
+                # ε=0.3mm keeps design fidelity while removing the sub-mm
+                # zigzags that cause jagged outlines and erratic fill splits.
+                scaled_subpaths = [_simplify_polygon(sp, epsilon=0.3)
+                                   for sp in scaled_subpaths]
+                scaled_subpaths = [sp for sp in scaled_subpaths if len(sp) >= 3]
+                groups = group_compound_subpaths(scaled_subpaths)
                 color_angle = _fill_angle_for(fill)
 
-                # ── Stitch type decision ──────────────────────────────────
-                #
-                # generate_satin_column() is a SPINE-based generator: it
-                # resamples an open path and fires perpendicular stitches
-                # across the spine.  It works well for open/elongated paths
-                # (letter stems, ribbons, outlines) but produces chaotic
-                # results on CLOSED compact shapes (circles, blobs) because
-                # it follows the perimeter and the inward stitches overlap
-                # and criss-cross in the interior.
-                #
-                # Rule:
-                #   • narrow < threshold  AND  aspect ≥ 2.5  →  satin COLUMN
-                #     (narrow + elongated = a ribbon or curved stem)
-                #   • narrow < threshold  AND  aspect < 2.5  →  dense FILL
-                #     (compact small shape → satin-like dense scanline)
-                #   • narrow ≥ threshold                     →  tatami FILL
-                #     (large shape → underlay + tatami scanline)
+                for group in groups:
+                    # Use the first (largest/outer) subpath to decide stitch type
+                    outer = group[0]
+                    ob    = _bbox(outer)
+                    ow, oh = ob[2]-ob[0], ob[3]-ob[1]
+                    narrow  = _shape_narrow_width(outer)
+                    aspect  = _shape_aspect(outer)
+                    max_dim = max(ow, oh)
 
-                ELONGATED = 2.5   # aspect ratio threshold for satin column
+                    ELONGATED    = 2.5   # aspect ratio for satin-column routing
+                    SMALL_CUTOFF = 20.0  # mm — shapes smaller than this always get dense satin
 
-                if narrow < s['satin_width_threshold'] and aspect >= ELONGATED:
-                    # Narrow AND elongated (ribbon, stem, arm) → satin column
-                    # Use dense scanline perpendicular to long axis — each row is one
-                    # crossing stitch (true satin), no chaotic perimeter-following.
-                    satin_angle = _satin_angle_for_shape(closed, color_angle)
-                    stitches = generate_scanline_fill(
-                        closed,
-                        row_spacing=s['satin_stitch_length'],
-                        stitch_length=s['max_stitch_length'],
-                        angle_deg=satin_angle,
-                        settings=settings,
-                    )
-                    if not stitches:
-                        # Fallback: path-based satin column
-                        stitches = generate_satin_column(
-                            scaled,
-                            width_mm=max(1.0, narrow * 0.9),
+                    if max_dim <= SMALL_CUTOFF or (narrow < s['satin_width_threshold'] and aspect >= ELONGATED):
+                        satin_angle = _satin_angle_for_shape(outer, color_angle)
+                        segments = compound_scanline_fill(
+                            group,
+                            row_spacing=s['satin_stitch_length'],
+                            stitch_length=s['max_stitch_length'],
+                            angle_deg=satin_angle,
                             settings=settings,
                         )
+                        stitch_type = 'satin'
 
-                elif narrow < s['satin_width_threshold']:
-                    # Compact and small → dense satin fill
-                    # row_spacing = satin density (0.4 mm) for tight parallel rows
-                    # stitch_length = max_stitch_length (12 mm) so each row is a
-                    # SINGLE crossing stitch from one edge to the other — true satin
-                    satin_angle = _satin_angle_for_shape(closed, color_angle)
-                    stitches = generate_scanline_fill(
-                        closed,
-                        row_spacing=s['satin_stitch_length'],
-                        stitch_length=s['max_stitch_length'],
-                        angle_deg=satin_angle,
-                        settings=settings,
-                    )
+                    elif narrow < s['satin_width_threshold']:
+                        satin_angle = _satin_angle_for_shape(outer, color_angle)
+                        segments = compound_scanline_fill(
+                            group,
+                            row_spacing=s['satin_stitch_length'],
+                            stitch_length=s['max_stitch_length'],
+                            angle_deg=satin_angle,
+                            settings=settings,
+                        )
+                        stitch_type = 'satin'
 
-                else:
-                    # Large shape → underlay + tatami fill
-                    angle = _satin_angle_for_shape(closed, color_angle)
-                    underlay = generate_underlay(closed, angle_deg=angle + 90, settings=settings)
-                    fill_st  = generate_scanline_fill(closed, angle_deg=angle, settings=settings)
-                    stitches = underlay + fill_st
+                    else:
+                        # Large shape → tatami fill (no separate underlay pass)
+                        # At 0.4mm row spacing the fill itself is dense enough to
+                        # anchor the fabric — a 90° underlay pass would only create
+                        # an ugly crosshatch grid in the preview and waste stitches.
+                        segments = compound_scanline_fill(group, angle_deg=color_angle, settings=settings)
+                        stitch_type = 'fill'
 
-                stitches = _cap_stitch_distance(stitches, settings=settings)
-                if stitches:
-                    stitch_blocks.append({'color': fill,
-                                          'stitches': stitches,
-                                          'type': 'fill'})
-                else:
-                    print(f"Element {i} ({el['tag']}) fill produced 0 stitches "
-                          f"(narrow={narrow:.2f}mm, aspect={aspect:.1f})")
+                    if any(seg for seg in segments if seg):
+                        stitch_blocks.append({'color': fill, 'segments': segments,
+                                              'type': stitch_type})
+                    else:
+                        print(f"Element {i} ({el['tag']}) group fill produced 0 stitches "
+                              f"(narrow={narrow:.2f}mm, aspect={aspect:.1f}, max_dim={max_dim:.1f}mm)")
 
-            # ── stroked outline ──────────────────────────────────────────
-            if stroke and stroke != 'none' and sw > 0:
+                    # ── Outline: outer boundary only ─────────────────────────
+                    # Hole boundaries are NOT traced — they create a tangle of
+                    # interior lines that obscure the design.  Only the outer
+                    # perimeter gets a running-stitch edge for clean shape definition.
+                    outer_outline = generate_running_stitches(outer, settings=settings)
+                    if outer_outline:
+                        stitch_blocks.append({
+                            'color': fill,
+                            'segments': [outer_outline],
+                            'type': 'outline',
+                        })
+
+        # ── stroked outlines — process each subpath individually ─────────────
+        if stroke and stroke != 'none' and sw > 0:
+            for subpath in subpaths:
+                if not subpath:
+                    continue
+                transformed = _apply_matrix(subpath, mat)
+                scaled = scale_coords(transformed, svg_w, svg_h, settings=settings)
+                if len(scaled) < 2:
+                    continue
                 sw_mm = sw * s['target_width_mm'] / max(svg_w, svg_h)
                 if sw_mm >= s['satin_width_threshold'] * 0.5:
-                    # Wide stroke → satin column
                     stitches = generate_satin_column(scaled, width_mm=max(1.0, sw_mm), settings=settings)
                 else:
-                    # Thin stroke → running stitch
                     stitches = generate_running_stitches(scaled, settings=settings)
-
                 stitches = _cap_stitch_distance(stitches, settings=settings)
-                if stitches:
-                    stitch_blocks.append({'color': stroke,
-                                          'stitches': stitches,
-                                          'type': 'stroke'})
+                if any(stitches):
+                    stitch_blocks.append({'color': stroke, 'segments': [stitches], 'type': 'stroke'})
                 else:
                     print(f"Element {i} ({el['tag']}) stroke produced 0 stitches")
 
@@ -946,18 +1268,39 @@ def add_svg_to_pattern(pattern, svg_content: str, settings: Optional[dict] = Non
         first_block = False
 
         for block in colour_groups[color]:
-            stitches = block['stitches']
-            if not stitches:
+            # Support both new 'segments' (list of point-lists) and
+            # legacy 'stitches' (flat list) in case any code path still uses it.
+            if 'segments' in block:
+                raw_segments = [seg for seg in block['segments'] if seg]
+            else:
+                raw_segments = [block.get('stitches', [])]
+
+            if not raw_segments:
                 continue
-            # Jump to start
-            pattern.add_stitch_absolute(pyembroidery.JUMP, stitches[0][0]*10, stitches[0][1]*10)
-            for j, (sx, sy) in enumerate(stitches):
-                if math.isnan(sx) or math.isnan(sy): continue
-                if math.isinf(sx) or math.isinf(sy): continue
-                pattern.add_stitch_absolute(pyembroidery.STITCH, sx*10, sy*10)
-            # Trim at end of each block
-            lx, ly = stitches[-1]
-            pattern.add_stitch_absolute(pyembroidery.TRIM, lx*10, ly*10)
+
+            for seg_idx, segment in enumerate(raw_segments):
+                if not segment:
+                    continue
+
+                # Cap individual within-segment stitch lengths (not cross-segment)
+                segment = _cap_stitch_distance(segment, settings=s)
+
+                # TRIM before each segment after the first
+                if seg_idx > 0:
+                    pattern.add_stitch_absolute(pyembroidery.TRIM, 0, 0)
+
+                # JUMP to start of this segment
+                pattern.add_stitch_absolute(pyembroidery.JUMP,
+                                            segment[0][0] * 10, segment[0][1] * 10)
+
+                for sx, sy in segment:
+                    if math.isnan(sx) or math.isnan(sy): continue
+                    if math.isinf(sx) or math.isinf(sy): continue
+                    pattern.add_stitch_absolute(pyembroidery.STITCH, sx * 10, sy * 10)
+
+                # Trim at end of segment
+                lx, ly = segment[-1]
+                pattern.add_stitch_absolute(pyembroidery.TRIM, lx * 10, ly * 10)
 
     # End of pattern
     pattern.add_stitch_absolute(pyembroidery.END, 0, 0)

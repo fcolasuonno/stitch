@@ -382,6 +382,37 @@ def _generate_preview_svg(pattern) -> str:
                 thread_colors.append('#000000')
         if not thread_colors:
             thread_colors = ['#000000']
+
+        import math as _pmath
+
+        def _emit_polyline(pts_list, color, lines_out):
+            """
+            Emit a polyline with stroke-width scaled to the run length.
+            Long runs (fill stitches) → thin + semi-transparent (don't dominate).
+            Short runs (outline stitches) → thicker + opaque (show design edges).
+            """
+            if len(pts_list) < 2:
+                return
+            # Measure total run length
+            total_len = sum(
+                _pmath.hypot(
+                    float(pts_list[j].split(',')[0]) - float(pts_list[j-1].split(',')[0]),
+                    float(pts_list[j].split(',')[1]) - float(pts_list[j-1].split(',')[1])
+                )
+                for j in range(1, len(pts_list))
+            )
+            if total_len > 300:        # long fill run: thin + semi-transparent
+                sw, opacity = 1.5, 0.55
+            elif total_len > 60:       # medium outline: normal
+                sw, opacity = 2.5, 0.85
+            else:                      # short run: full weight
+                sw, opacity = 3.0, 1.0
+            lines_out.append(
+                f'<polyline points="{" ".join(pts_list)}" fill="none" stroke="{color}"'
+                f' stroke-width="{sw}" opacity="{opacity}"'
+                f' stroke-linecap="round" stroke-linejoin="round"/>'
+            )
+
         lines = []
         current_points = []
         color_idx = 0
@@ -392,23 +423,18 @@ def _generate_preview_svg(pattern) -> str:
             if cmd == pyembroidery.STITCH:
                 current_points.append(f"{sx:.1f},{sy:.1f}")
             elif cmd in (pyembroidery.COLOR_CHANGE, pyembroidery.COLOR_BREAK):
-                if len(current_points) >= 2:
-                    c = thread_colors[color_idx % len(thread_colors)]
-                    lines.append(f'<polyline points="{" ".join(current_points)}" fill="none" stroke="{c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>')
+                _emit_polyline(current_points, thread_colors[color_idx % len(thread_colors)], lines)
                 current_points = []
                 color_idx += 1
             elif cmd in (pyembroidery.JUMP, pyembroidery.TRIM):
-                if len(current_points) >= 2:
-                    c = thread_colors[color_idx % len(thread_colors)]
-                    lines.append(f'<polyline points="{" ".join(current_points)}" fill="none" stroke="{c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>')
+                _emit_polyline(current_points, thread_colors[color_idx % len(thread_colors)], lines)
                 current_points = [f"{sx:.1f},{sy:.1f}"]
             elif cmd == pyembroidery.END:
                 break
             else:
                 current_points.append(f"{sx:.1f},{sy:.1f}")
-        if len(current_points) >= 2:
-            c = thread_colors[color_idx % len(thread_colors)]
-            lines.append(f'<polyline points="{" ".join(current_points)}" fill="none" stroke="{c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>')
+        _emit_polyline(current_points, thread_colors[color_idx % len(thread_colors)], lines)
+
         svg = (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}"'
             f' width="600" height="{600 * height / width:.0f}"'
