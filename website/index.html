@@ -797,7 +797,7 @@
         <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload file">
             <div class="upload-icon">📁</div>
             <div class="upload-text">Click to select a file</div>
-            <div class="upload-hint">SVG · PNG · JPG · BMP · GIF · TIFF · WebP — or drag &amp; drop</div>
+            <div class="upload-hint">SVG · PNG · JPG · BMP · GIF · TIFF · WebP — drag &amp; drop or paste</div>
             <input type="file" id="fileInput" accept=".svg,.png,.jpg,.jpeg,.bmp,.gif,.tiff,.tif,.webp,image/*"
                 aria-label="Select file" />
         </div>
@@ -1750,6 +1750,37 @@
         function showError(msg) { errorMessage.textContent = msg; errorMessage.style.display = 'block'; successMessage.style.display = 'none'; }
         function showSuccess(msg) { successMessage.textContent = msg; successMessage.style.display = 'block'; errorMessage.style.display = 'none'; }
         function hideMessages() { errorMessage.style.display = 'none'; successMessage.style.display = 'none'; }
+
+        // ── paste support ─────────────────────────────────────────────────────────────
+        window.addEventListener('paste', e => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                // 1. Handle image blobs (e.g. screenshot, copied from Photoshop/browser)
+                if (items[i].type.startsWith('image/')) {
+                    const blob = items[i].getAsFile();
+                    if (!blob) continue;
+                    // Standardize filename for pasted blobs
+                    const ext = blob.type.split('/')[1] || 'png';
+                    const file = new File([blob], `pasted_image_${new Date().getTime()}.${ext}`, { type: blob.type });
+                    handleFileSelected(file);
+                    showSuccess('Image pasted from clipboard.');
+                    e.preventDefault();
+                    return;
+                }
+                // 2. Handle SVG text (if user copied SVG code)
+                if (items[i].type === 'text/plain') {
+                    items[i].getAsString(text => {
+                        const trimmed = text.trim();
+                        if (trimmed.startsWith('<svg') || trimmed.startsWith('<?xml')) {
+                            const blob = new Blob([trimmed], { type: 'image/svg+xml' });
+                            const file = new File([blob], `pasted_svg_${new Date().getTime()}.svg`, { type: 'image/svg+xml' });
+                            handleFileSelected(file);
+                            showSuccess('SVG code pasted from clipboard.');
+                        }
+                    });
+                }
+            }
+        });
 
         // ── canonical URL ─────────────────────────────────────────────────────────────
         (function () { document.getElementById('canonical-url').setAttribute('href', window.location.href.split('?')[0]); })();
