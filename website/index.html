@@ -880,21 +880,33 @@
 
         <!-- ★ Colour palette panel -->
         <div class="param-panel palette" id="palettePanel" style="display:none;">
-            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette</div>
+            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette &amp; reduction</div>
             <div class="panel-body" id="paletteBody" style="display:grid;">
                 <div class="param-group full-width">
                     <p class="palette-hint" id="paletteHint">Upload a file to detect colours.</p>
-                    <div class="palette-swatches" id="paletteSwatches"></div>
+                    <div class="palette-swatches" id="paletteSwatches" style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; margin:10px 0;"></div>
                     <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:2px;">
-                        Click a swatch to exclude that colour from the embroidery.
-                        Click on the image preview to pick a colour.
+                        Click a row to exclude. Use the dropdowns to manually merge.
                     </p>
                 </div>
+
+                <div class="param-group full-width" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label class="param-label" style="margin-bottom: 6px;">Automatic Reduction (Target Colour Count)</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="range" id="reductionTargetCount" min="2" max="32" value="16" style="flex:1;">
+                        <span id="reductionTargetVal" style="color:#fcd34d; font-size:0.85rem; min-width:30px; font-weight:bold;">16</span>
+                        <button class="pal-btn" id="reductionApplyBtn">Apply</button>
+                    </div>
+                    <p style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:4px;">
+                        Merges colours automatically to reach the target count.
+                    </p>
+                </div>
+
                 <div class="param-group full-width">
                     <div class="palette-actions">
                         <button class="pal-btn" id="palEnableAll">✓ Enable all</button>
                         <button class="pal-btn" id="palDisableAll">✕ Exclude all</button>
-                        <button class="pal-btn" id="palExtractBtn">⟳ Re-detect from preview</button>
+                        <button class="pal-btn" id="palExtractBtn">⟳ Re-detect</button>
                     </div>
                 </div>
             </div>
@@ -1424,8 +1436,26 @@
         // ═══════════════════════════════════════════════════════════════════
         makeToggle(paletteToggle, paletteBody);
 
-        // Map: hex → {excluded: bool}
+        // Map: hex → {excluded: bool, mergedInto: hex|null}
         const paletteState = {};
+
+        function hexToRgb(h) {
+            if (!h || typeof h !== 'string' || h[0] !== '#') return [128,128,128];
+            let s = h.slice(1);
+            if (s.length === 3) s = s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+            if (s.length !== 6) return [128,128,128];
+            return [parseInt(s.slice(0,2),16), parseInt(s.slice(2,4),16), parseInt(s.slice(4,6),16)];
+        }
+
+        function getColorName(hex) {
+            const names = {
+                "#000000":"Black", "#ffffff":"White", "#ff0000":"Red", "#00ff00":"Green",
+                "#0000ff":"Blue", "#ffff00":"Yellow", "#00ffff":"Cyan", "#ff00ff":"Magenta",
+                "#808080":"Gray", "#ffa500":"Orange", "#800080":"Purple", "#a52a2a":"Brown",
+                "#ffd700":"Gold", "#008080":"Teal", "#000080":"Navy", "#800000":"Maroon"
+            };
+            return names[hex.toLowerCase()] || "";
+        }
 
         function buildSwatches(colors) {
             paletteSwatches.innerHTML = '';
@@ -1433,41 +1463,159 @@
                 paletteHint.textContent = 'No colours detected.';
                 return;
             }
-            paletteHint.textContent = colors.length + ' colour' + (colors.length !== 1 ? 's' : '') + ' detected — click to exclude:';
+            paletteHint.textContent = colors.length + ' colour' + (colors.length !== 1 ? 's' : '') + ' detected:';
+            
+            // Set slider max
+            const slider = document.getElementById('reductionTargetCount');
+            if (slider) {
+                slider.max = colors.length;
+                if (parseInt(slider.value) > colors.length) slider.value = colors.length;
+                document.getElementById('reductionTargetVal').textContent = slider.value;
+            }
+
+            const colorOptions = colors.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('');
+
             colors.forEach(hex => {
-                if (!paletteState[hex]) paletteState[hex] = { excluded: false };
-                const wrap = document.createElement('div');
-                wrap.className = 'swatch-wrap';
-                wrap.title = hex + ' — click to toggle';
+                if (!paletteState[hex]) paletteState[hex] = { excluded: false, mergedInto: null };
+                
+                const row = document.createElement('div');
+                row.className = 'palette-row';
+                row.style.background = 'rgba(255,255,255,0.04)';
+                row.style.padding = '6px 10px';
+                row.style.borderRadius = '8px';
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '10px';
+                row.style.transition = 'background 0.2s';
+                row.style.cursor = 'pointer';
 
                 const sw = document.createElement('div');
                 sw.className = 'swatch' + (paletteState[hex].excluded ? ' excluded' : '');
                 sw.style.background = hex;
+                sw.style.width = '24px';
+                sw.style.height = '24px';
+                sw.style.minWidth = '24px';
+                sw.style.borderRadius = '4px';
                 sw.dataset.hex = hex;
+                if (paletteState[hex].mergedInto && paletteState[hex].mergedInto !== hex) sw.style.opacity = '0.3';
 
-                const lbl = document.createElement('span');
-                lbl.className = 'swatch-hex';
-                lbl.textContent = hex;
+                const info = document.createElement('div');
+                info.style.flex = '1';
+                info.style.display = 'flex';
+                info.style.flexDirection = 'column';
+                info.style.overflow = 'hidden';
 
-                wrap.appendChild(sw);
-                wrap.appendChild(lbl);
-                paletteSwatches.appendChild(wrap);
+                const name = getColorName(hex);
+                if (name) {
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = name;
+                    nameSpan.style.fontSize = '0.8rem';
+                    nameSpan.style.fontWeight = 'bold';
+                    nameSpan.style.color = '#fff';
+                    nameSpan.style.whiteSpace = 'normal';
+                    nameSpan.style.wordBreak = 'break-word';
+                    info.appendChild(nameSpan);
+                }
 
-                wrap.addEventListener('click', () => {
+                const hexSpan = document.createElement('span');
+                hexSpan.textContent = hex.toUpperCase();
+                hexSpan.style.fontSize = '0.7rem';
+                hexSpan.style.color = 'rgba(255,255,255,0.5)';
+                hexSpan.style.fontFamily = 'monospace';
+                info.appendChild(hexSpan);
+
+                const controls = document.createElement('div');
+                controls.style.display = 'flex';
+                controls.style.alignItems = 'center';
+                controls.style.gap = '6px';
+                controls.onclick = (e) => e.stopPropagation();
+
+                const sel = document.createElement('select');
+                sel.style.fontSize = '0.7rem';
+                sel.style.background = 'rgba(0,0,0,0.3)';
+                sel.style.border = '1px solid rgba(255,255,255,0.1)';
+                sel.style.color = '#fff';
+                sel.style.borderRadius = '4px';
+                sel.style.padding = '2px';
+                sel.innerHTML = `<option value="">(Merge...)</option>${colorOptions}`;
+                if (paletteState[hex].mergedInto) sel.value = paletteState[hex].mergedInto;
+                
+                sel.addEventListener('change', (e) => {
+                    paletteState[hex].mergedInto = e.target.value || null;
+                    sw.style.opacity = (e.target.value && e.target.value !== hex) ? '0.3' : '1';
+                });
+
+                controls.appendChild(sel);
+
+                row.appendChild(sw);
+                row.appendChild(info);
+                row.appendChild(controls);
+                paletteSwatches.appendChild(row);
+
+                row.addEventListener('click', () => {
                     paletteState[hex].excluded = !paletteState[hex].excluded;
                     sw.classList.toggle('excluded', paletteState[hex].excluded);
+                    row.style.background = paletteState[hex].excluded ? 'rgba(255,0,0,0.05)' : 'rgba(255,255,255,0.04)';
                 });
+                if (paletteState[hex].excluded) row.style.background = 'rgba(255,0,0,0.05)';
             });
         }
 
         function getColorMap() {
             const map = {};
-            let hasExclusions = false;
+            let hasMap = false;
             Object.entries(paletteState).forEach(([hex, s]) => {
-                if (s.excluded) { map[hex] = null; hasExclusions = true; }
+                if (s.excluded) { 
+                    map[hex] = null; 
+                    hasMap = true; 
+                } else if (s.mergedInto && s.mergedInto !== hex) {
+                    map[hex] = s.mergedInto;
+                    hasMap = true;
+                }
             });
-            return hasExclusions ? JSON.stringify(map) : null;
+            return hasMap ? JSON.stringify(map) : null;
         }
+
+        function colorDist(h1, h2) {
+            const [r1,g1,b1] = hexToRgb(h1);
+            const [r2,g2,b2] = hexToRgb(h2);
+            return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+        }
+
+        document.getElementById('reductionTargetCount')?.addEventListener('input', (e) => {
+            document.getElementById('reductionTargetVal').textContent = e.target.value;
+        });
+
+        document.getElementById('reductionApplyBtn')?.addEventListener('click', () => {
+            const targetCount = parseInt(document.getElementById('reductionTargetCount').value);
+            const colors = Object.keys(paletteState);
+            if (colors.length <= targetCount) return;
+
+            // Reset merges
+            colors.forEach(c => paletteState[c].mergedInto = null);
+
+            // Greedy clustering to reach targetCount
+            let currentClusters = colors.map(c => ({ main: c, members: [c] }));
+
+            while (currentClusters.length > targetCount) {
+                let minD = Infinity;
+                let bestI = -1, bestJ = -1;
+                for (let i = 0; i < currentClusters.length; i++) {
+                    for (let j = i + 1; j < currentClusters.length; j++) {
+                        let d = colorDist(currentClusters[i].main, currentClusters[j].main);
+                        if (d < minD) { minD = d; bestI = i; bestJ = j; }
+                    }
+                }
+                // Merge bestJ into bestI
+                currentClusters[bestJ].members.forEach(m => {
+                    paletteState[m].mergedInto = currentClusters[bestI].main;
+                    currentClusters[bestI].members.push(m);
+                });
+                currentClusters.splice(bestJ, 1);
+            }
+
+            buildSwatches(colors);
+        });
 
         // Allow clicking on the SVG preview image to pick & exclude colours
         function attachPreviewColorPicker(imgEl) {
@@ -1496,7 +1644,11 @@
                 if (best && bestDist < 5000) {
                     paletteState[best].excluded = !paletteState[best].excluded;
                     const sw = paletteSwatches.querySelector('[data-hex="' + best + '"]');
-                    if (sw) sw.classList.toggle('excluded', paletteState[best].excluded);
+                    if (sw) {
+                        sw.classList.toggle('excluded', paletteState[best].excluded);
+                        const row = sw.closest('.palette-row');
+                        if (row) row.style.background = paletteState[best].excluded ? 'rgba(255,0,0,0.05)' : 'rgba(255,255,255,0.04)';
+                    }
                 }
             });
         }
@@ -1549,11 +1701,18 @@
         }
 
         function normColor(val) {
-            val = val.trim();
+            if (!val) return null;
+            val = val.trim().toLowerCase();
+            const named = {
+                'black':'#000000','white':'#ffffff','red':'#ff0000','green':'#008000',
+                'blue':'#0000ff','yellow':'#ffff00','orange':'#ffa500','purple':'#800080',
+                'gray':'#808080','grey':'#808080','cyan':'#00ffff','magenta':'#ff00ff'
+            };
+            if (named[val]) return named[val];
             if (val.startsWith('#')) {
                 const h = val.slice(1);
                 if (h.length === 3) return '#' + h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-                if (h.length === 6) return val.toLowerCase();
+                if (h.length === 6) return '#' + h;
             }
             const m = val.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
             if (m) return '#' + [m[1], m[2], m[3]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');

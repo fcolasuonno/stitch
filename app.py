@@ -71,7 +71,13 @@ def _parse_svg_color(val: str) -> Optional[str]:
     m = re.match(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", val, re.I)
     if m:
         return "#{:02x}{:02x}{:02x}".format(int(m[1]), int(m[2]), int(m[3]))
-    return None
+    
+    named = {
+        'black':'#000000','white':'#ffffff','red':'#ff0000','green':'#008000',
+        'blue':'#0000ff','yellow':'#ffff00','orange':'#ffa500','purple':'#800080',
+        'gray':'#808080','grey':'#808080','cyan':'#00ffff','magenta':'#ff00ff'
+    }
+    return named.get(val.lower())
 
 
 def _rgb_to_hex(r: int, g: int, b: int) -> str:
@@ -463,10 +469,11 @@ async def extract_colors(
 ):
     try:
         if svg_base64:
-            svg_str = base64.b64decode(svg_base64).decode("utf-8")
+            if "," in svg_base64: svg_base64 = svg_base64.split(",")[1]
+            svg_str = base64.b64decode(svg_base64).decode("utf-8", errors="replace")
         elif file:
             content = await file.read()
-            svg_str = content.decode("utf-8")
+            svg_str = content.decode("utf-8", errors="replace")
         else:
             raise HTTPException(status_code=400, detail="Provide file or svg_base64")
         colors = _extract_svg_colors(svg_str)
