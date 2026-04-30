@@ -7,7 +7,7 @@
     <title>ur/gd Studios: stitch</title>
     <meta property="og:title" content="stitch - SVG/Image to VP3 Converter">
     <meta property="og:description"
-        content="Convert SVG or raster images to VP3 embroidery format. Powered by vtracer + ur/gd Studios.">
+        content="Convert SVG or raster images to VP3 embroidery format. Edit SVGs inline with the built-in SVG editor. Powered by vtracer + ur/gd Studios.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ur/gd Studios">
     <meta name="author" content="ur/gd Studios">
@@ -784,6 +784,57 @@
             background:
                 repeating-conic-gradient(#333 0% 25%, #1a1a2e 0% 50%) 0 0 / 16px 16px;
         }
+
+        /* ── inline svg editor panel ── */
+        .svg-editor-panel {
+            margin: 16px 0;
+            border-radius: 14px;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            background: rgba(99, 102, 241, 0.06);
+            overflow: hidden;
+        }
+
+        .svg-editor-panel-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 13px 18px;
+            cursor: pointer;
+            user-select: none;
+            color: rgba(255, 255, 255, 0.88);
+            font-weight: bold;
+            font-size: 0.92rem;
+            gap: 8px;
+        }
+
+        .svg-editor-panel-title:hover {
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .svg-editor-panel-title .chevron {
+            transition: transform 0.22s ease;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .svg-editor-panel-title.collapsed .chevron {
+            transform: rotate(-90deg);
+        }
+
+        .svg-editor-hint {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: normal;
+        }
+
+        .svg-editor-frame {
+            width: 100%;
+            height: 560px;
+            border: none;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+            display: block;
+            background: #fff;
+        }
     </style>
 </head>
 
@@ -880,21 +931,27 @@
 
         <!-- ★ Colour palette panel -->
         <div class="param-panel palette" id="palettePanel" style="display:none;">
-            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette &amp; reduction</div>
+            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette &amp; reduction
+            </div>
             <div class="panel-body" id="paletteBody" style="display:grid;">
                 <div class="param-group full-width">
                     <p class="palette-hint" id="paletteHint">Upload a file to detect colours.</p>
-                    <div class="palette-swatches" id="paletteSwatches" style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; margin:10px 0;"></div>
+                    <div class="palette-swatches" id="paletteSwatches"
+                        style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; margin:10px 0;">
+                    </div>
                     <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:2px;">
                         Click a row to exclude. Use the dropdowns to manually merge.
                     </p>
                 </div>
 
-                <div class="param-group full-width" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label class="param-label" style="margin-bottom: 6px;">Automatic Reduction (Target Colour Count)</label>
+                <div class="param-group full-width"
+                    style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label class="param-label" style="margin-bottom: 6px;">Automatic Reduction (Target Colour
+                        Count)</label>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <input type="range" id="reductionTargetCount" min="2" max="32" value="16" style="flex:1;">
-                        <span id="reductionTargetVal" style="color:#fcd34d; font-size:0.85rem; min-width:30px; font-weight:bold;">16</span>
+                        <span id="reductionTargetVal"
+                            style="color:#fcd34d; font-size:0.85rem; min-width:30px; font-weight:bold;">16</span>
                         <button class="pal-btn" id="reductionApplyBtn">Apply</button>
                     </div>
                     <p style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:4px;">
@@ -1057,8 +1114,6 @@
         <div class="btn-row" id="btnRow">
             <button class="btn btn-purple" id="convertBtn" disabled>Convert to VP3</button>
             <button class="btn btn-violet" id="traceBtn" disabled style="display:none;">Trace to SVG</button>
-            <button class="btn btn-purple" id="traceConvertBtn" disabled style="display:none;">Trace &amp;
-                Convert</button>
         </div>
 
         <!-- Progress -->
@@ -1080,6 +1135,18 @@
         <div class="preview-box stitch-prev" id="previewArea">
             <div class="preview-box-title">🔍 Embroidery Preview</div>
             <img id="previewImage" alt="Embroidery stitch preview" />
+        </div>
+
+        <!-- Inline SVG Editor -->
+        <div class="svg-editor-panel" id="svgEditorPanel" style="display:none;">
+            <div class="svg-editor-panel-title" id="svgEditorToggle">
+                <span><span class="chevron">▾</span> ✏️ SVG Editor</span>
+                <span class="svg-editor-hint">Edit before converting</span>
+            </div>
+            <div id="svgEditorBody">
+                <iframe id="svgEditorFrame" src="/svgedit/index.html" class="svg-editor-frame" title="SVG Editor"
+                    allow="clipboard-read; clipboard-write"></iframe>
+            </div>
         </div>
 
         <!-- Downloads -->
@@ -1111,7 +1178,6 @@
         const vp3Body = document.getElementById('vp3Body');
         const convertBtn = document.getElementById('convertBtn');
         const traceBtn = document.getElementById('traceBtn');
-        const traceConvertBtn = document.getElementById('traceConvertBtn');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
@@ -1285,7 +1351,6 @@
                 modeBadge.innerHTML = '<span class="mode-badge svg">SVG → VP3</span>';
                 convertBtn.style.display = 'inline-block'; convertBtn.disabled = false;
                 traceBtn.style.display = 'none';
-                traceConvertBtn.style.display = 'none';
                 vtracerPanel.style.display = 'none';
                 vp3Panel.style.display = 'block';
                 bgPanel.style.display = 'block';
@@ -1308,13 +1373,14 @@
                     const cols = extractColorsFromSVGText(svgText);
                     Object.keys(paletteState).forEach(k => delete paletteState[k]);
                     buildSwatches(cols);
+                    // Load into inline SVG editor
+                    loadSvgIntoEditor(svgText);
                 };
                 reader.readAsText(file);
             } else {
                 modeBadge.innerHTML = '<span class="mode-badge raster">Image → SVG → VP3 via vtracer</span>';
                 convertBtn.style.display = 'none';
                 traceBtn.style.display = 'inline-block'; traceBtn.disabled = false;
-                traceConvertBtn.style.display = 'inline-block'; traceConvertBtn.disabled = false;
                 vtracerPanel.style.display = 'block';
                 vp3Panel.style.display = 'block';
                 bgPanel.style.display = 'block';
@@ -1339,6 +1405,8 @@
                     paletteSwatches.innerHTML = '';
                 };
                 reader.readAsDataURL(file);
+                // Hide editor panel until a trace is done
+                svgEditorPanel.style.display = 'none';
             }
         }
 
@@ -1440,19 +1508,19 @@
         const paletteState = {};
 
         function hexToRgb(h) {
-            if (!h || typeof h !== 'string' || h[0] !== '#') return [128,128,128];
+            if (!h || typeof h !== 'string' || h[0] !== '#') return [128, 128, 128];
             let s = h.slice(1);
-            if (s.length === 3) s = s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
-            if (s.length !== 6) return [128,128,128];
-            return [parseInt(s.slice(0,2),16), parseInt(s.slice(2,4),16), parseInt(s.slice(4,6),16)];
+            if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+            if (s.length !== 6) return [128, 128, 128];
+            return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
         }
 
         function getColorName(hex) {
             const names = {
-                "#000000":"Black", "#ffffff":"White", "#ff0000":"Red", "#00ff00":"Green",
-                "#0000ff":"Blue", "#ffff00":"Yellow", "#00ffff":"Cyan", "#ff00ff":"Magenta",
-                "#808080":"Gray", "#ffa500":"Orange", "#800080":"Purple", "#a52a2a":"Brown",
-                "#ffd700":"Gold", "#008080":"Teal", "#000080":"Navy", "#800000":"Maroon"
+                "#000000": "Black", "#ffffff": "White", "#ff0000": "Red", "#00ff00": "Green",
+                "#0000ff": "Blue", "#ffff00": "Yellow", "#00ffff": "Cyan", "#ff00ff": "Magenta",
+                "#808080": "Gray", "#ffa500": "Orange", "#800080": "Purple", "#a52a2a": "Brown",
+                "#ffd700": "Gold", "#008080": "Teal", "#000080": "Navy", "#800000": "Maroon"
             };
             return names[hex.toLowerCase()] || "";
         }
@@ -1464,7 +1532,7 @@
                 return;
             }
             paletteHint.textContent = colors.length + ' colour' + (colors.length !== 1 ? 's' : '') + ' detected:';
-            
+
             // Set slider max
             const slider = document.getElementById('reductionTargetCount');
             if (slider) {
@@ -1477,7 +1545,7 @@
 
             colors.forEach(hex => {
                 if (!paletteState[hex]) paletteState[hex] = { excluded: false, mergedInto: null };
-                
+
                 const row = document.createElement('div');
                 row.className = 'palette-row';
                 row.style.background = 'rgba(255,255,255,0.04)';
@@ -1539,7 +1607,7 @@
                 sel.style.padding = '2px';
                 sel.innerHTML = `<option value="">(Merge...)</option>${colorOptions}`;
                 if (paletteState[hex].mergedInto) sel.value = paletteState[hex].mergedInto;
-                
+
                 sel.addEventListener('change', (e) => {
                     paletteState[hex].mergedInto = e.target.value || null;
                     sw.style.opacity = (e.target.value && e.target.value !== hex) ? '0.3' : '1';
@@ -1565,9 +1633,9 @@
             const map = {};
             let hasMap = false;
             Object.entries(paletteState).forEach(([hex, s]) => {
-                if (s.excluded) { 
-                    map[hex] = null; 
-                    hasMap = true; 
+                if (s.excluded) {
+                    map[hex] = null;
+                    hasMap = true;
                 } else if (s.mergedInto && s.mergedInto !== hex) {
                     map[hex] = s.mergedInto;
                     hasMap = true;
@@ -1577,9 +1645,9 @@
         }
 
         function colorDist(h1, h2) {
-            const [r1,g1,b1] = hexToRgb(h1);
-            const [r2,g2,b2] = hexToRgb(h2);
-            return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+            const [r1, g1, b1] = hexToRgb(h1);
+            const [r2, g2, b2] = hexToRgb(h2);
+            return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
         }
 
         document.getElementById('reductionTargetCount')?.addEventListener('input', (e) => {
@@ -1704,9 +1772,9 @@
             if (!val) return null;
             val = val.trim().toLowerCase();
             const named = {
-                'black':'#000000','white':'#ffffff','red':'#ff0000','green':'#008000',
-                'blue':'#0000ff','yellow':'#ffff00','orange':'#ffa500','purple':'#800080',
-                'gray':'#808080','grey':'#808080','cyan':'#00ffff','magenta':'#ff00ff'
+                'black': '#000000', 'white': '#ffffff', 'red': '#ff0000', 'green': '#008000',
+                'blue': '#0000ff', 'yellow': '#ffff00', 'orange': '#ffa500', 'purple': '#800080',
+                'gray': '#808080', 'grey': '#808080', 'cyan': '#00ffff', 'magenta': '#ff00ff'
             };
             if (named[val]) return named[val];
             if (val.startsWith('#')) {
@@ -1740,8 +1808,15 @@
             return fd;
         }
 
-        function vp3FormData(fd = new FormData()) {
-            if (!fd.has('file')) fd.append('file', selectedFile);
+        async function vp3FormData(fd = new FormData()) {
+            // Prefer SVG from the inline editor (captures any edits), fall back to selectedFile
+            const editorSvg = getEditorSvgString();
+            if (editorSvg) {
+                const baseName = selectedFile ? selectedFile.name.replace(/\.[^.]+$/, '') + '.svg' : 'design.svg';
+                fd.append('file', new File([editorSvg], baseName, { type: 'image/svg+xml' }));
+            } else if (selectedFile) {
+                fd.append('file', selectedFile);
+            }
             fd.append('fill_density', document.getElementById('vp_fill_density').value);
             fd.append('fill_stitch_length', document.getElementById('vp_fill_stitch_length').value);
             fd.append('satin_stitch_length', document.getElementById('vp_satin_stitch_length').value);
@@ -1787,30 +1862,33 @@
 
         // ── button handlers ───────────────────────────────────────────────────────────
         function lockBtns(label) {
-            [convertBtn, traceBtn, traceConvertBtn].forEach(b => b.disabled = true);
-            const active = fileMode === 'svg' ? convertBtn : (label.includes('Trace &') ? traceConvertBtn : traceBtn);
-            active.innerHTML = `<span class="loading"></span>${label}`;
+            [convertBtn, traceBtn].forEach(b => { if (b) b.disabled = true; });
+            const active = fileMode === 'svg' ? convertBtn : traceBtn;
+            if (active) active.innerHTML = `<span class="loading"></span>${label}`;
         }
         function unlockBtns() {
-            if (fileMode === 'svg') { convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3'; }
-            else {
+            if (fileMode === 'svg') {
+                convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3';
+            } else {
                 traceBtn.disabled = false; traceBtn.innerHTML = 'Trace to SVG';
-                traceConvertBtn.disabled = false; traceConvertBtn.innerHTML = 'Trace &amp; Convert';
+                // After a trace has been done the convert btn may be visible — re-enable it too
+                if (convertBtn.style.display !== 'none') { convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3'; }
             }
         }
 
-        // SVG → VP3
+        // SVG → VP3  (uses editor SVG when available)
         convertBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+            if (!selectedFile && !getEditorSvgString()) return;
             lockBtns('Converting…');
             showProgress('Converting SVG to VP3…');
             hideResults();
             try {
-                const fd = vp3FormData();
+                const fd = await vp3FormData();
                 const r = await fetchWithCancel('/api/convert', { method: 'POST', body: fd });
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Conversion failed');
-                showVp3Result(d, selectedFile.name.replace(/\.svg$/i, ''));
+                const baseName = selectedFile ? selectedFile.name.replace(/\.[^.]+$/, '') : 'design';
+                showVp3Result(d, baseName);
             } catch (e) { showError('Conversion failed: ' + e.message); }
             finally { unlockBtns(); hideProgress(); }
         });
@@ -1826,32 +1904,17 @@
                 const r = await fetchWithCancel('/api/trace', { method: 'POST', body: fd });
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Tracing failed');
+                // Show the traced SVG preview
                 showSvgPreview(d.svg_base64);
                 applyResponseColors(d);
+                const svgText = atob(d.svg_base64);
                 attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg');
                 downloadArea.style.display = 'block';
-                showSuccess('Image traced to SVG. Adjust VP3 settings and click "Trace & Convert" to also export VP3.');
+                // Load traced SVG into the inline editor and reveal convert button
+                loadSvgIntoEditor(svgText);
+                convertBtn.style.display = 'inline-block'; convertBtn.disabled = false;
+                showSuccess('Image traced to SVG — edit in the editor below, then click "Convert to VP3".');
             } catch (e) { showError('Tracing failed: ' + e.message); }
-            finally { unlockBtns(); hideProgress(); }
-        });
-
-        // Raster → SVG → VP3
-        traceConvertBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-            lockBtns('Trace & Convert…');
-            showProgress('Step 1/2 — tracing image…');
-            hideResults();
-            try {
-                const fd = vtracerFormData();
-                vp3FormData(fd); // merge VP3 params into same FormData
-                progressText.textContent = 'Step 2/2 — converting to VP3…';
-                const r = await fetchWithCancel('/api/trace-convert', { method: 'POST', body: fd });
-                const d = await r.json();
-                if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Trace-convert failed');
-                if (d.svg_base64) { showSvgPreview(d.svg_base64); attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg'); }
-                applyResponseColors(d);
-                showVp3Result(d, selectedFile.name.replace(/\.[^.]+$/, ''));
-            } catch (e) { showError('Trace-convert failed: ' + e.message); }
             finally { unlockBtns(); hideProgress(); }
         });
 
@@ -1940,6 +2003,86 @@
                 }
             }
         });
+
+        // ── Inline SVG Editor ─────────────────────────────────────────────────────────
+        const svgEditorPanel = document.getElementById('svgEditorPanel');
+        const svgEditorFrame = document.getElementById('svgEditorFrame');
+        const svgEditorToggle = document.getElementById('svgEditorToggle');
+        const svgEditorBody = document.getElementById('svgEditorBody');
+
+        let _editorReady = false;
+        let _editorReadyCallbacks = [];
+        let _editorLoaded = false; // true once we've pushed an SVG into the editor
+
+        function _onEditorReady(cb) {
+            if (_editorReady) { cb(); return; }
+            _editorReadyCallbacks.push(cb);
+        }
+
+        svgEditorFrame.addEventListener('load', () => {
+            const iframeDoc = svgEditorFrame.contentDocument;
+            iframeDoc.addEventListener('svgedit:ready', () => {
+                _editorReady = true;
+                _editorReadyCallbacks.forEach(cb => cb());
+                _editorReadyCallbacks = [];
+            });
+        });
+
+        // Collapsible toggle for the editor panel
+        svgEditorToggle.addEventListener('click', () => {
+            const collapsed = svgEditorToggle.classList.toggle('collapsed');
+            svgEditorBody.style.display = collapsed ? 'none' : 'block';
+        });
+
+        function _getRawEditor() {
+            return svgEditorFrame.contentWindow && svgEditorFrame.contentWindow.svgEditor;
+        }
+
+        /** Return current SVG string from editor, or null if not loaded / unavailable */
+        function getEditorSvgString() {
+            if (!_editorLoaded) return null;
+            try {
+                const editor = _getRawEditor();
+                if (!editor) return null;
+                return editor.svgCanvas ? editor.svgCanvas.getSvgString() : null;
+            } catch (e) {
+                console.warn('Could not get SVG from editor:', e);
+                return null;
+            }
+        }
+
+        /** Load an SVG string into the inline editor and reveal the panel */
+        function loadSvgIntoEditor(svgText) {
+            svgEditorPanel.style.display = 'block';
+            // Ensure toggle is open
+            svgEditorToggle.classList.remove('collapsed');
+            svgEditorBody.style.display = 'block';
+
+            const doLoad = () => {
+                const editor = _getRawEditor();
+                if (editor && typeof editor.loadSvgString === 'function') {
+                    try {
+                        editor.loadSvgString(svgText);
+                        _editorLoaded = true;
+                    } catch (e) { console.warn('loadSvgString failed:', e); }
+                }
+            };
+
+            if (_editorReady) {
+                doLoad();
+            } else {
+                _onEditorReady(doLoad);
+                // Polling fallback (svgedit:ready may have already fired before our load listener)
+                const poll = setInterval(() => {
+                    const editor = _getRawEditor();
+                    if (editor && typeof editor.loadSvgString === 'function') {
+                        clearInterval(poll);
+                        _editorReady = true;
+                        doLoad();
+                    }
+                }, 250);
+            }
+        }
 
         // ── canonical URL ─────────────────────────────────────────────────────────────
         (function () { document.getElementById('canonical-url').setAttribute('href', window.location.href.split('?')[0]); })();
