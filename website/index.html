@@ -39,7 +39,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            padding: 30px 20px;
+            padding: 24px 16px;
         }
 
         .container {
@@ -49,8 +49,8 @@
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
-            padding: 40px;
-            max-width: 640px;
+            padding: 36px 40px;
+            max-width: 1280px;
             width: 100%;
             text-align: center;
             position: relative;
@@ -236,8 +236,14 @@
         .panel-body {
             margin-top: 16px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 13px;
+        }
+
+        @media(max-width:900px) {
+            .panel-body {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         @media(max-width:520px) {
@@ -787,38 +793,26 @@
 
         /* ── inline svg editor panel ── */
         .svg-editor-panel {
-            margin: 16px 0;
+            margin: 20px 0;
             border-radius: 14px;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            background: rgba(99, 102, 241, 0.05);
             overflow: hidden;
         }
 
-        .svg-editor-panel-title {
+        .svg-editor-panel-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 13px 18px;
-            cursor: pointer;
-            user-select: none;
-            color: rgba(255, 255, 255, 0.88);
+            padding: 12px 18px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+            background: rgba(99, 102, 241, 0.07);
+        }
+
+        .svg-editor-panel-header span {
+            color: rgba(255, 255, 255, 0.85);
             font-weight: bold;
-            font-size: 0.92rem;
-            gap: 8px;
-        }
-
-        .svg-editor-panel-title:hover {
-            background: rgba(99, 102, 241, 0.08);
-        }
-
-        .svg-editor-panel-title .chevron {
-            transition: transform 0.22s ease;
-            font-size: 0.75rem;
-            opacity: 0.7;
-        }
-
-        .svg-editor-panel-title.collapsed .chevron {
-            transform: rotate(-90deg);
+            font-size: 0.9rem;
         }
 
         .svg-editor-hint {
@@ -829,11 +823,47 @@
 
         .svg-editor-frame {
             width: 100%;
-            height: 560px;
+            height: calc(100vh - 220px);
+            min-height: 540px;
+            max-height: 900px;
             border: none;
-            border-top: 1px solid rgba(99, 102, 241, 0.2);
             display: block;
             background: #fff;
+        }
+
+        /* ── section dividers ── */
+        .section-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.07);
+            margin: 8px 0 4px;
+        }
+
+        /* ── raster preview ── */
+        .raster-preview {
+            margin: 16px 0;
+            padding: 16px;
+            border-radius: 14px;
+            background: rgba(118, 75, 162, 0.07);
+            border: 1px solid rgba(118, 75, 162, 0.2);
+            display: none;
+        }
+
+        .raster-preview img {
+            max-width: 100%;
+            max-height: 320px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+            object-fit: contain;
+            background: repeating-conic-gradient(#333 0% 25%, #1a1a2e 0% 50%) 0 0 / 16px 16px;
+        }
+
+        .raster-preview-title {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.78rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -860,117 +890,16 @@
             <div id="modeBadge"></div>
         </div>
 
+        <!-- ══ RASTER SECTION (shown only when a raster image is loaded) ══ -->
 
-        <!-- ★ Background removal panel -->
-        <div class="param-panel bg-removal" id="bgPanel" style="display:none;">
-            <div class="panel-title" id="bgToggle"><span class="chevron">▾</span> 🎨 Background removal</div>
-            <div class="panel-body" id="bgBody" style="display:grid;">
-                <div class="param-group full-width">
-                    <label class="param-label" style="cursor:pointer;">
-                        <span>Remove background</span>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                            <input type="checkbox" id="removeBgCheck" style="width:auto;accent-color:#ef4444;">
-                            <span id="removeBgLabel" style="font-size:0.8rem;color:#f87171;">Off</span>
-                        </label>
-                    </label>
-                </div>
-                <div class="param-group" id="bgThresholdGroup" style="display:none;">
-                    <label class="param-label" for="bgThreshold">Flood-fill tolerance <span class="val"
-                            id="vv_bgThreshold" style="color:#f87171;">30</span></label>
-                    <input type="range" id="bgThreshold" min="5" max="120" value="30" step="5">
-                </div>
-                <div class="param-group" id="bgHintGroup" style="display:none;">
-                    <p style="font-size:0.74rem;color:rgba(255,255,255,0.4);line-height:1.5;">
-                        Flood-fills outward from the image edges.
-                        Only pixels <em>connected to the border</em> are removed — so enclosed
-                        shapes (e.g. white text inside a black circle) are always preserved.
-                        Increase tolerance for anti-aliased or gradient edges.
-                        For SVG files the background &lt;rect&gt; is removed structurally, not by colour.
-                    </p>
-                </div>
-            </div>
+        <!-- Raster preview -->
+        <div class="raster-preview" id="rasterPreviewArea">
+            <div class="raster-preview-title">🖼 Source image</div>
+            <img id="rasterPreviewImage" alt="Source image preview" />
         </div>
 
-        <!-- ★ Size / hoop panel -->
-        <div class="param-panel size-hoop" id="sizePanel" style="display:none;">
-            <div class="panel-title" id="sizeToggle"><span class="chevron">▾</span> 📐 Size &amp; hoop</div>
-            <div class="panel-body" id="sizeBody" style="display:grid;">
-                <div class="param-group full-width">
-                    <label class="param-label">Hoop presets</label>
-                    <div class="hoop-presets" id="hoopPresets">
-                        <button class="hoop-btn" data-w="40" data-h="40">40×40 mm (Mini)</button>
-                        <button class="hoop-btn" data-w="60" data-h="40">60×40 mm</button>
-                        <button class="hoop-btn" data-w="100" data-h="100">100×100 mm (4×4″)</button>
-                        <button class="hoop-btn" data-w="130" data-h="180">130×180 mm (5×7″)</button>
-                        <button class="hoop-btn" data-w="150" data-h="200">150×200 mm (6×8″)</button>
-                        <button class="hoop-btn" data-w="200" data-h="200">200×200 mm (8×8″)</button>
-                        <button class="hoop-btn" data-w="240" data-h="200">240×200 mm (MEGA)</button>
-                        <button class="hoop-btn" data-w="180" data-h="300">180×300 mm (7×12″)</button>
-                        <button class="hoop-btn" data-w="260" data-h="200">260×200 mm (Jumbo)</button>
-                    </div>
-                </div>
-                <div class="param-group full-width">
-                    <label class="param-label">Custom size (mm)</label>
-                    <div class="size-inputs">
-                        <div>
-                            <label class="param-label" for="sizeWidth">Width</label>
-                            <input type="number" id="sizeWidth" min="10" max="500" value="100" step="1">
-                        </div>
-                        <div>
-                            <label class="param-label" for="sizeHeight">Height <span
-                                    style="color:rgba(255,255,255,0.3);font-size:0.7rem;">(aspect locked)</span></label>
-                            <input type="number" id="sizeHeight" min="10" max="500" value="100" step="1">
-                        </div>
-                    </div>
-                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:6px;">
-                        The design will be scaled to fit within these bounds while preserving aspect ratio.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- ★ Colour palette panel -->
-        <div class="param-panel palette" id="palettePanel" style="display:none;">
-            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette &amp; reduction
-            </div>
-            <div class="panel-body" id="paletteBody" style="display:grid;">
-                <div class="param-group full-width">
-                    <p class="palette-hint" id="paletteHint">Upload a file to detect colours.</p>
-                    <div class="palette-swatches" id="paletteSwatches"
-                        style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; margin:10px 0;">
-                    </div>
-                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:2px;">
-                        Click a row to exclude. Use the dropdowns to manually merge.
-                    </p>
-                </div>
-
-                <div class="param-group full-width"
-                    style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label class="param-label" style="margin-bottom: 6px;">Automatic Reduction (Target Colour
-                        Count)</label>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="range" id="reductionTargetCount" min="2" max="32" value="16" style="flex:1;">
-                        <span id="reductionTargetVal"
-                            style="color:#fcd34d; font-size:0.85rem; min-width:30px; font-weight:bold;">16</span>
-                        <button class="pal-btn" id="reductionApplyBtn">Apply</button>
-                    </div>
-                    <p style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:4px;">
-                        Merges colours automatically to reach the target count.
-                    </p>
-                </div>
-
-                <div class="param-group full-width">
-                    <div class="palette-actions">
-                        <button class="pal-btn" id="palEnableAll">✓ Enable all</button>
-                        <button class="pal-btn" id="palDisableAll">✕ Exclude all</button>
-                        <button class="pal-btn" id="palExtractBtn">⟳ Re-detect</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ① vtracer params (raster only) -->
-        <div class="param-panel vtracer" id="vtracerPanel">
+        <!-- vtracer params (raster only) -->
+        <div class="param-panel vtracer" id="vtracerPanel" style="display:none;">
             <div class="panel-title" id="vtracerToggle"><span class="chevron">▾</span> 🎛 vtracer — tracing parameters
             </div>
             <div class="panel-body" id="vtracerBody">
@@ -1042,8 +971,142 @@
             </div>
         </div>
 
-        <!-- ② VP3 stitch params (always shown when file selected) -->
-        <div class="param-panel vp3" id="vp3Panel">
+        <!-- Trace button (raster only) -->
+        <div class="btn-row" id="traceBtnRow" style="display:none;">
+            <button class="btn btn-violet" id="traceBtn" disabled>Trace to SVG</button>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Working…</div>
+            <button class="cancel-btn" id="cancelBtn">Cancel Operation</button>
+        </div>
+
+        <!-- ══ SVG SECTION (shown after trace or when SVG uploaded) ══ -->
+
+        <!-- SVG Editor (serves as preview + editor) -->
+        <div class="svg-editor-panel" id="svgEditorPanel" style="display:none;">
+            <div class="svg-editor-panel-header">
+                <span>✏️ SVG Editor</span>
+                <span class="svg-editor-hint">Edit the design before converting · changes are used automatically</span>
+            </div>
+            <iframe id="svgEditorFrame" src="/svgedit/index.html" class="svg-editor-frame" title="SVG Editor"
+                allow="clipboard-read; clipboard-write"></iframe>
+        </div>
+
+        <!-- ★ Background removal panel (SVG section) -->
+        <div class="param-panel bg-removal" id="bgPanel" style="display:none;">
+            <div class="panel-title" id="bgToggle"><span class="chevron">▾</span> 🎨 Background removal</div>
+            <div class="panel-body" id="bgBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <label class="param-label" style="cursor:pointer;">
+                        <span>Remove background</span>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" id="removeBgCheck" style="width:auto;accent-color:#ef4444;">
+                            <span id="removeBgLabel" style="font-size:0.8rem;color:#f87171;">Off</span>
+                        </label>
+                    </label>
+                </div>
+                <div class="param-group" id="bgThresholdGroup" style="display:none;">
+                    <label class="param-label" for="bgThreshold">Flood-fill tolerance <span class="val"
+                            id="vv_bgThreshold" style="color:#f87171;">30</span></label>
+                    <input type="range" id="bgThreshold" min="5" max="120" value="30" step="5">
+                </div>
+                <div class="param-group" id="bgHintGroup" style="display:none;">
+                    <p style="font-size:0.74rem;color:rgba(255,255,255,0.4);line-height:1.5;">
+                        Flood-fills outward from the image edges.
+                        Only pixels <em>connected to the border</em> are removed — so enclosed
+                        shapes (e.g. white text inside a black circle) are always preserved.
+                        Increase tolerance for anti-aliased or gradient edges.
+                        For SVG files the background &lt;rect&gt; is removed structurally, not by colour.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ★ Size / hoop panel (SVG section) -->
+        <div class="param-panel size-hoop" id="sizePanel" style="display:none;">
+            <div class="panel-title" id="sizeToggle"><span class="chevron">▾</span> 📐 Size &amp; hoop</div>
+            <div class="panel-body" id="sizeBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <label class="param-label">Hoop presets</label>
+                    <div class="hoop-presets" id="hoopPresets">
+                        <button class="hoop-btn" data-w="40" data-h="40">40×40 mm (Mini)</button>
+                        <button class="hoop-btn" data-w="60" data-h="40">60×40 mm</button>
+                        <button class="hoop-btn" data-w="100" data-h="100">100×100 mm (4×4″)</button>
+                        <button class="hoop-btn" data-w="130" data-h="180">130×180 mm (5×7″)</button>
+                        <button class="hoop-btn" data-w="150" data-h="200">150×200 mm (6×8″)</button>
+                        <button class="hoop-btn" data-w="200" data-h="200">200×200 mm (8×8″)</button>
+                        <button class="hoop-btn" data-w="240" data-h="200">240×200 mm (MEGA)</button>
+                        <button class="hoop-btn" data-w="180" data-h="300">180×300 mm (7×12″)</button>
+                        <button class="hoop-btn" data-w="260" data-h="200">260×200 mm (Jumbo)</button>
+                    </div>
+                </div>
+                <div class="param-group full-width">
+                    <label class="param-label">Custom size (mm)</label>
+                    <div class="size-inputs">
+                        <div>
+                            <label class="param-label" for="sizeWidth">Width</label>
+                            <input type="number" id="sizeWidth" min="10" max="500" value="100" step="1">
+                        </div>
+                        <div>
+                            <label class="param-label" for="sizeHeight">Height <span
+                                    style="color:rgba(255,255,255,0.3);font-size:0.7rem;">(aspect locked)</span></label>
+                            <input type="number" id="sizeHeight" min="10" max="500" value="100" step="1">
+                        </div>
+                    </div>
+                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:6px;">
+                        The design will be scaled to fit within these bounds while preserving aspect ratio.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ★ Colour palette panel (SVG section) -->
+        <div class="param-panel palette" id="palettePanel" style="display:none;">
+            <div class="panel-title" id="paletteToggle"><span class="chevron">▾</span> 🎨 Colour palette &amp; reduction
+            </div>
+            <div class="panel-body" id="paletteBody" style="display:grid;">
+                <div class="param-group full-width">
+                    <p class="palette-hint" id="paletteHint">Upload a file to detect colours.</p>
+                    <div class="palette-swatches" id="paletteSwatches"
+                        style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; margin:10px 0;">
+                    </div>
+                    <p style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:2px;">
+                        Click a row to exclude. Use the dropdowns to manually merge.
+                    </p>
+                </div>
+
+                <div class="param-group full-width"
+                    style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label class="param-label" style="margin-bottom: 6px;">Automatic Reduction (Target Colour
+                        Count)</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="range" id="reductionTargetCount" min="2" max="32" value="16" style="flex:1;">
+                        <span id="reductionTargetVal"
+                            style="color:#fcd34d; font-size:0.85rem; min-width:30px; font-weight:bold;">16</span>
+                        <button class="pal-btn" id="reductionApplyBtn">Apply</button>
+                    </div>
+                    <p style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:4px;">
+                        Merges colours automatically to reach the target count.
+                    </p>
+                </div>
+
+                <div class="param-group full-width">
+                    <div class="palette-actions">
+                        <button class="pal-btn" id="palEnableAll">✓ Enable all</button>
+                        <button class="pal-btn" id="palDisableAll">✕ Exclude all</button>
+                        <button class="pal-btn" id="palExtractBtn">⟳ Re-detect</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VP3 stitch params (SVG section) -->
+        <div class="param-panel vp3" id="vp3Panel" style="display:none;">
             <div class="panel-title" id="vp3Toggle"><span class="chevron">▾</span> 🪡 VP3 — stitch parameters</div>
             <div class="panel-body" id="vp3Body">
                 <div class="param-group">
@@ -1096,7 +1159,6 @@
                         ↑ Output size is controlled in the <strong style="color:#4ade80;">Size &amp; hoop</strong> panel
                         above.
                     </label>
-                    <!-- hidden input keeps the FormData API intact -->
                     <input type="hidden" id="vp_target_width_mm" value="100">
                 </div>
                 <div class="param-group">
@@ -1110,43 +1172,17 @@
             </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="btn-row" id="btnRow">
-            <button class="btn btn-purple" id="convertBtn" disabled>Convert to VP3</button>
-            <button class="btn btn-violet" id="traceBtn" disabled style="display:none;">Trace to SVG</button>
+        <!-- Convert button (SVG section) -->
+        <div class="btn-row" id="convertBtnRow" style="display:none;">
+            <button class="btn btn-purple" id="convertBtn">Convert to VP3</button>
         </div>
 
-        <!-- Progress -->
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="progress-text" id="progressText">Working…</div>
-            <button class="cancel-btn" id="cancelBtn">Cancel Operation</button>
-        </div>
+        <!-- ══ OUTPUT SECTION ══ -->
 
-        <!-- Traced SVG preview -->
-        <div class="preview-box svg-prev" id="svgPreviewArea">
-            <div class="preview-box-title">🖼 Traced SVG</div>
-            <img id="svgPreviewImage" alt="Traced SVG preview" />
-        </div>
-
-        <!-- Stitch preview -->
+        <!-- VP3 embroidery stitch preview -->
         <div class="preview-box stitch-prev" id="previewArea">
             <div class="preview-box-title">🔍 Embroidery Preview</div>
             <img id="previewImage" alt="Embroidery stitch preview" />
-        </div>
-
-        <!-- Inline SVG Editor -->
-        <div class="svg-editor-panel" id="svgEditorPanel" style="display:none;">
-            <div class="svg-editor-panel-title" id="svgEditorToggle">
-                <span><span class="chevron">▾</span> ✏️ SVG Editor</span>
-                <span class="svg-editor-hint">Edit before converting</span>
-            </div>
-            <div id="svgEditorBody">
-                <iframe id="svgEditorFrame" src="/svgedit/index.html" class="svg-editor-frame" title="SVG Editor"
-                    allow="clipboard-read; clipboard-write"></iframe>
-            </div>
         </div>
 
         <!-- Downloads -->
@@ -1157,6 +1193,11 @@
                 <a href="#" class="dl-btn vp3" id="downloadVp3Btn" style="display:none;">⬇ Download VP3</a>
             </div>
         </div>
+
+        <!-- keep this hidden element so old JS refs don't crash -->
+        <div id="svgPreviewArea" style="display:none;"><img id="svgPreviewImage" alt="" /></div>
+        <!-- keep old btnRow stub for any residual refs -->
+        <div id="btnRow" style="display:none;"></div>
 
         <div class="error" id="errorMessage" role="alert" aria-live="polite"></div>
         <div class="success" id="successMessage" role="status" aria-live="polite"></div>
@@ -1178,10 +1219,15 @@
         const vp3Body = document.getElementById('vp3Body');
         const convertBtn = document.getElementById('convertBtn');
         const traceBtn = document.getElementById('traceBtn');
+        const traceBtnRow = document.getElementById('traceBtnRow');
+        const convertBtnRow = document.getElementById('convertBtnRow');
+        const rasterPreviewArea = document.getElementById('rasterPreviewArea');
+        const rasterPreviewImage = document.getElementById('rasterPreviewImage');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         const cancelBtn = document.getElementById('cancelBtn');
+        // legacy stubs kept for JS compatibility
         const svgPreviewArea = document.getElementById('svgPreviewArea');
         const svgPreviewImage = document.getElementById('svgPreviewImage');
         const previewArea = document.getElementById('previewArea');
@@ -1341,72 +1387,70 @@
             fileInfo.style.display = 'block';
             fileMode = mode;
             hideMessages(); hideResults();
-            // Reset palette state for new file
             Object.keys(paletteState).forEach(k => delete paletteState[k]);
             paletteSwatches.innerHTML = '';
             paletteHint.textContent = 'Upload a file to detect colours.';
 
-
             if (mode === 'svg') {
                 modeBadge.innerHTML = '<span class="mode-badge svg">SVG → VP3</span>';
-                convertBtn.style.display = 'inline-block'; convertBtn.disabled = false;
-                traceBtn.style.display = 'none';
+
+                // Show SVG section, hide raster section
+                rasterPreviewArea.style.display = 'none';
                 vtracerPanel.style.display = 'none';
+                traceBtnRow.style.display = 'none';
+
                 vp3Panel.style.display = 'block';
                 bgPanel.style.display = 'block';
                 sizePanel.style.display = 'block';
                 palettePanel.style.display = 'block';
+                convertBtnRow.style.display = 'flex';
 
-                // Show immediate preview of the uploaded SVG
                 const reader = new FileReader();
                 reader.onload = e => {
                     const svgText = e.target.result;
-                    showSvgPreview(btoa(svgText), 'Uploaded SVG');
-                    attachPreviewColorPicker(svgPreviewImage);
-                    // Extract natural dimensions for size panel
+                    // Extract natural dimensions
                     const dimMatch = svgText.match(/viewBox="[\d.\s,]*/);
                     if (dimMatch) {
                         const parts = dimMatch[0].replace('viewBox="', '').trim().split(/[\s,]+/);
                         if (parts.length >= 4) setNaturalAspect(parseFloat(parts[2]), parseFloat(parts[3]));
                     }
-                    // Extract colours client-side
+                    // Extract colours
                     const cols = extractColorsFromSVGText(svgText);
-                    Object.keys(paletteState).forEach(k => delete paletteState[k]);
                     buildSwatches(cols);
-                    // Load into inline SVG editor
+                    // Load into editor (editor IS the preview)
                     loadSvgIntoEditor(svgText);
                 };
                 reader.readAsText(file);
             } else {
                 modeBadge.innerHTML = '<span class="mode-badge raster">Image → SVG → VP3 via vtracer</span>';
-                convertBtn.style.display = 'none';
-                traceBtn.style.display = 'inline-block'; traceBtn.disabled = false;
+
+                // Show raster section, hide SVG section
+                vp3Panel.style.display = 'none';
+                bgPanel.style.display = 'none';
+                sizePanel.style.display = 'none';
+                palettePanel.style.display = 'none';
+                convertBtnRow.style.display = 'none';
+                svgEditorPanel.style.display = 'none';
+                _editorLoaded = false;
+
+                rasterPreviewArea.style.display = 'block';
                 vtracerPanel.style.display = 'block';
-                vp3Panel.style.display = 'block';
-                bgPanel.style.display = 'block';
-                sizePanel.style.display = 'block';
-                palettePanel.style.display = 'block';
-                // ensure all panels open
-                [vtracerToggle, vp3Toggle, bgToggle, sizeToggle, paletteToggle].forEach(t => { t.classList.remove('collapsed'); });
-                [vtracerBody, vp3Body, bgBody, sizeBody, paletteBody].forEach(b => { b.style.display = 'grid'; });
+                traceBtnRow.style.display = 'flex';
+                traceBtn.disabled = false;
+
+                // Ensure vtracer panel is open
+                vtracerToggle.classList.remove('collapsed');
+                vtracerBody.style.display = 'grid';
 
                 // Show raster preview
                 const reader = new FileReader();
                 reader.onload = e => {
-                    svgPreviewImage.src = e.target.result;
-                    svgPreviewArea.querySelector('.preview-box-title').textContent = '🖼 Source Image';
-                    svgPreviewArea.style.display = 'block';
-                    attachPreviewColorPicker(svgPreviewImage);
-                    // Detect natural size from Image for hoop/size panel
+                    rasterPreviewImage.src = e.target.result;
                     const img = new Image();
                     img.onload = () => setNaturalAspect(img.naturalWidth, img.naturalHeight);
                     img.src = e.target.result;
-                    paletteHint.textContent = 'Colours will appear after tracing.';
-                    paletteSwatches.innerHTML = '';
                 };
                 reader.readAsDataURL(file);
-                // Hide editor panel until a trace is done
-                svgEditorPanel.style.display = 'none';
             }
         }
 
@@ -1862,17 +1906,20 @@
 
         // ── button handlers ───────────────────────────────────────────────────────────
         function lockBtns(label) {
-            [convertBtn, traceBtn].forEach(b => { if (b) b.disabled = true; });
+            convertBtn.disabled = true;
+            traceBtn.disabled = true;
             const active = fileMode === 'svg' ? convertBtn : traceBtn;
-            if (active) active.innerHTML = `<span class="loading"></span>${label}`;
+            active.innerHTML = `<span class="loading"></span>${label}`;
         }
         function unlockBtns() {
             if (fileMode === 'svg') {
-                convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3';
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = 'Convert to VP3';
             } else {
-                traceBtn.disabled = false; traceBtn.innerHTML = 'Trace to SVG';
-                // After a trace has been done the convert btn may be visible — re-enable it too
-                if (convertBtn.style.display !== 'none') { convertBtn.disabled = false; convertBtn.innerHTML = 'Convert to VP3'; }
+                traceBtn.disabled = false;
+                traceBtn.innerHTML = 'Trace to SVG';
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = 'Convert to VP3';
             }
         }
 
@@ -1881,7 +1928,9 @@
             if (!selectedFile && !getEditorSvgString()) return;
             lockBtns('Converting…');
             showProgress('Converting SVG to VP3…');
-            hideResults();
+            previewArea.style.display = 'none';
+            downloadArea.style.display = 'none';
+            downloadVp3Btn.style.display = 'none';
             try {
                 const fd = await vp3FormData();
                 const r = await fetchWithCancel('/api/convert', { method: 'POST', body: fd });
@@ -1893,27 +1942,28 @@
             finally { unlockBtns(); hideProgress(); }
         });
 
-        // Raster → SVG only
+        // Raster → SVG
         traceBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
             lockBtns('Tracing…');
             showProgress('Tracing with vtracer…');
-            hideResults();
             try {
                 const fd = vtracerFormData();
                 const r = await fetchWithCancel('/api/trace', { method: 'POST', body: fd });
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.detail || d.message || 'Tracing failed');
-                // Show the traced SVG preview
-                showSvgPreview(d.svg_base64);
-                applyResponseColors(d);
                 const svgText = atob(d.svg_base64);
+                applyResponseColors(d);
                 attachSvgDownload(d.svg_base64, selectedFile.name.replace(/\.[^.]+$/, '') + '_traced.svg');
-                downloadArea.style.display = 'block';
-                // Load traced SVG into the inline editor and reveal convert button
+                // Load traced SVG into editor (editor becomes the preview)
                 loadSvgIntoEditor(svgText);
-                convertBtn.style.display = 'inline-block'; convertBtn.disabled = false;
-                showSuccess('Image traced to SVG — edit in the editor below, then click "Convert to VP3".');
+                // Show VP3 section now that we have an SVG
+                vp3Panel.style.display = 'block';
+                bgPanel.style.display = 'block';
+                sizePanel.style.display = 'block';
+                palettePanel.style.display = 'block';
+                convertBtnRow.style.display = 'flex';
+                showSuccess('Traced to SVG — edit in the editor above if needed, then click "Convert to VP3".');
             } catch (e) { showError('Tracing failed: ' + e.message); }
             finally { unlockBtns(); hideProgress(); }
         });
@@ -1957,18 +2007,27 @@
         }
 
         function attachSvgDownload(svg_b64, filename) {
-            const blob = new Blob([atob(svg_b64)], { type: 'image/svg+xml' });
-            const url = URL.createObjectURL(blob);
-            downloadSvgBtn.href = url;
             downloadSvgBtn.download = filename;
             downloadSvgBtn.style.display = 'inline-block';
-            downloadSvgBtn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1000);
+            // At click time, prefer the editor's current SVG (captures any edits)
+            downloadSvgBtn.onclick = (e) => {
+                e.preventDefault();
+                const editorSvg = getEditorSvgString();
+                const content = editorSvg || atob(svg_b64);
+                const blob = new Blob([content], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            };
         }
 
         // ── ui state helpers ──────────────────────────────────────────────────────────
         function showProgress(msg) { progressText.textContent = msg; progressFill.style.width = '45%'; progressContainer.style.display = 'block'; }
         function hideProgress() { progressContainer.style.display = 'none'; progressFill.style.width = '0%'; }
-        function hideResults() { svgPreviewArea.style.display = 'none'; previewArea.style.display = 'none'; downloadArea.style.display = 'none'; downloadSvgBtn.style.display = 'none'; downloadVp3Btn.style.display = 'none'; }
+        function hideResults() { previewArea.style.display = 'none'; downloadArea.style.display = 'none'; downloadSvgBtn.style.display = 'none'; downloadVp3Btn.style.display = 'none'; }
         function showError(msg) { errorMessage.textContent = msg; errorMessage.style.display = 'block'; successMessage.style.display = 'none'; }
         function showSuccess(msg) { successMessage.textContent = msg; successMessage.style.display = 'block'; errorMessage.style.display = 'none'; }
         function hideMessages() { errorMessage.style.display = 'none'; successMessage.style.display = 'none'; }
@@ -2007,12 +2066,10 @@
         // ── Inline SVG Editor ─────────────────────────────────────────────────────────
         const svgEditorPanel = document.getElementById('svgEditorPanel');
         const svgEditorFrame = document.getElementById('svgEditorFrame');
-        const svgEditorToggle = document.getElementById('svgEditorToggle');
-        const svgEditorBody = document.getElementById('svgEditorBody');
 
         let _editorReady = false;
         let _editorReadyCallbacks = [];
-        let _editorLoaded = false; // true once we've pushed an SVG into the editor
+        let _editorLoaded = false;
 
         function _onEditorReady(cb) {
             if (_editorReady) { cb(); return; }
@@ -2028,17 +2085,10 @@
             });
         });
 
-        // Collapsible toggle for the editor panel
-        svgEditorToggle.addEventListener('click', () => {
-            const collapsed = svgEditorToggle.classList.toggle('collapsed');
-            svgEditorBody.style.display = collapsed ? 'none' : 'block';
-        });
-
         function _getRawEditor() {
             return svgEditorFrame.contentWindow && svgEditorFrame.contentWindow.svgEditor;
         }
 
-        /** Return current SVG string from editor, or null if not loaded / unavailable */
         function getEditorSvgString() {
             if (!_editorLoaded) return null;
             try {
@@ -2051,12 +2101,19 @@
             }
         }
 
-        /** Load an SVG string into the inline editor and reveal the panel */
+        function _fitEditorToDrawing() {
+            try {
+                const editor = _getRawEditor();
+                if (!editor || !editor.svgCanvas) return;
+                // Try zoom-to-fit — svgedit 7.x API
+                if (typeof editor.svgCanvas.zoomChanged === 'function') {
+                    editor.svgCanvas.zoomChanged(window, 'fit', true);
+                }
+            } catch (e) { /* non-critical */ }
+        }
+
         function loadSvgIntoEditor(svgText) {
             svgEditorPanel.style.display = 'block';
-            // Ensure toggle is open
-            svgEditorToggle.classList.remove('collapsed');
-            svgEditorBody.style.display = 'block';
 
             const doLoad = () => {
                 const editor = _getRawEditor();
@@ -2064,6 +2121,8 @@
                     try {
                         editor.loadSvgString(svgText);
                         _editorLoaded = true;
+                        // Give the editor a moment to render, then fit
+                        setTimeout(_fitEditorToDrawing, 300);
                     } catch (e) { console.warn('loadSvgString failed:', e); }
                 }
             };
@@ -2072,7 +2131,6 @@
                 doLoad();
             } else {
                 _onEditorReady(doLoad);
-                // Polling fallback (svgedit:ready may have already fired before our load listener)
                 const poll = setInterval(() => {
                     const editor = _getRawEditor();
                     if (editor && typeof editor.loadSvgString === 'function') {
